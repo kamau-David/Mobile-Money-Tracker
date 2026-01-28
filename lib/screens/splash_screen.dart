@@ -59,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 duration: const Duration(milliseconds: 1000),
                 child: Image.asset(
                   'assets/MoneyWise.png',
-                  // This makes the logo cover half the width, but center of the full screen
+
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,

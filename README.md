@@ -35,4 +35,4 @@ A professional-grade **Flutter** financial application built to track daily tran
 
 1. **Clone the project:**
    ```bash
-   git clone [https://github.com/kamau-David/mobile_money_tracker.git](https://github.com/kamau-David/mobile_money_tracker.git)
+   git clone [https://github.com/kamau-David/Mobile_Money_Tracker.git](https://github.com/kamau-David/Mobile_Money_Tracker.git)
