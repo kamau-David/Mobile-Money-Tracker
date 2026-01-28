@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_money_tracker/screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/summary_screen.dart';
@@ -13,7 +14,7 @@ class TrackerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const MainContainer(),
+      home: const SplashScreen(),
       theme: ThemeData(scaffoldBackgroundColor: Colors.white),
     );
   }
