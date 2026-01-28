@@ -1,14 +1,14 @@
 # 📱 Mobile-Money Tracker
 
-A professional-grade **Flutter** financial application built to track daily transactions, monitor balances, and visualize spending habits. This project focuses on a clean User Experience (UX) and modular code architecture.
+A professional-grade **Flutter** financial application built to track daily transactions, monitor balances, and visualize spending habits. This project features a high-fidelity User Experience (UX) with custom animations and a modular code architecture.
 
 ---
 
 ## 📸 App Preview
 
-| Home Screen | Add Transaction |
-| :---: | :---: |
-| ![Home](screenshots/home.png) | ![Add](screenshots/add_transaction.png) |
+| Full-Screen Splash | Home Screen | Add Transaction |
+| :---: | :---: | :---: |
+| ![Splash](screenshots/splash.png) | ![Home](screenshots/home.png) | ![Add](screenshots/add_transaction.png) |
 
 | Spending Summary | Transaction History |
 | :---: | :---: |
@@ -18,17 +18,19 @@ A professional-grade **Flutter** financial application built to track daily tran
 
 ## ✨ Key Features
 
-* **Financial Dashboard:** Quick-view cards for current balance and monthly expenditures.
-* **Smart Categorization:** Easily log expenses with specific categories like Groceries, Salary, and Transfers.
-* **Data Visualization:** Interactive **Pie Charts** (via `fl_chart`) to analyze spending distribution.
-* **Clean History:** Transaction logs organized with individual cards and custom date-stamped dividers.
-* **User-Centric UI:** Built with a cohesive green theme and consistent spacing for better readability.
+* **Immersive Animated Splash:** A custom full-screen entry experience featuring an "emerging" brand animation with `AnimatedScale` and `AnimatedOpacity`.
+* **Financial Dashboard:** High-contrast cards for real-time tracking of current balance and monthly expenditures.
+* **Data Visualization:** Interactive **Pie Charts** (via `fl_chart`) to provide a visual breakdown of spending distribution.
+* **Smart Categorization:** Intuitive transaction logging for categories such as Groceries, Salary, and Transfers.
+* **Clean History Management:** Transaction logs organized with individual cards and custom date-stamped dividers for maximum scannability.
+* **Responsive UI:** Fully optimized for various device sizes with a cohesive "Money-Green" theme.
 
 ## 🛠️ Tech Stack
 
 * **Framework:** Flutter (Web & Mobile)
 * **Language:** Dart
-* **Charts:** `fl_chart` package
+* **Animations:** Flutter Implicit Animations (`Curves.easeOutBack`)
+* **Charts:** `fl_chart` library
 * **Icons:** Material Design Icons
 
 ## 🚀 Installation & Setup
