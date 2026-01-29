@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_money_tracker/screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/summary_screen.dart';
 import 'screens/history_screen.dart';
 
-void main() => runApp(const TrackerApp());
+void main() => runApp(const ProviderScope(child: TrackerApp()));
 
 class TrackerApp extends StatelessWidget {
   const TrackerApp({super.key});

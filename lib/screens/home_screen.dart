@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/finance_provider.dart'; // Make sure this path is correct
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the finance state
+    final finance = ref.watch(financeProvider);
+    final transactions = finance.transactions;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2E7D32),
@@ -16,70 +22,63 @@ class HomeScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        leading: const Icon(Icons.menu, color: Colors.white),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Icon(Icons.notifications, color: Colors.white, size: 30),
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _statCard(
-                      "Balance",
-                      "KES 192,500",
-                      const Color(0xFF1565C0),
-                    ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Balance Cards Section
+            Row(
+              children: [
+                Expanded(
+                  child: _statCard(
+                    "Balance",
+                    "KES ${finance.balance}",
+                    const Color(0xFF1565C0),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _statCard(
-                      "This Month",
-                      "-KES 27,200",
-                      const Color(0xFFC62828),
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _statCard(
+                    "This Month",
+                    "-KES 27,200",
+                    const Color(0xFFC62828),
                   ),
-                ],
-              ),
-              const SizedBox(height: 25),
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+            const Text(
+              "Recent Transactions",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            ),
+            const SizedBox(height: 10),
 
-              Text(
-                "Recent Transactions",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-
-              const SizedBox(height: 10),
-              _listTile("Groceries", "Shopping", "- 700 KES", Colors.red),
-              _listTile(
-                "M-Pesa Transfer",
-                "Transfer",
-                "- 20,000 KES",
-                Colors.green,
-              ),
-
-              _listTile("salary", "income", "+ 100000 KES", Colors.green),
-
-              _listTile("Airtime", "calls", "- 5000 KES", Colors.red),
-
-              _listTile("Entertainment", "games", "- 5000 KES", Colors.red),
-
-              _listTile("Books", "learning", "- 10,000 KES", Colors.red),
-            ],
-          ),
+            // DYNAMIC LIST SECTION
+            Expanded(
+              child: transactions.isEmpty
+                  ? const Center(child: Text("No transactions yet. Add some!"))
+                  : ListView.builder(
+                      itemCount: transactions.length,
+                      itemBuilder: (context, index) {
+                        final tx = transactions[index];
+                        return _listTile(
+                          tx.title,
+                          tx.category,
+                          tx.amount,
+                          tx.color,
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // Your existing _statCard and _listTile widgets stay the same
   Widget _statCard(String title, String val, Color col) {
     return Container(
       padding: const EdgeInsets.all(16),
