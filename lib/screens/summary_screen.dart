@@ -1,100 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../providers/finance_provider.dart';
 
-class SummaryScreen extends StatelessWidget {
+class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categoryData = ref.watch(categorySpendingProvider);
+    final totalSpent = ref.watch(filteredTotalSpentProvider);
+    final activeFilter = ref.watch(financeProvider).activeFilter;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2E7D32),
         title: const Text(
           "Spending Summary",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                    thickness: 1,
-                    color: Colors.grey,
-                    indent: 10,
-                    endIndent: 10,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.center,
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    elevation: 2,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: const Text(
-                        "April 2024",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                    thickness: 1,
-                    color: Colors.grey,
-                    indent: 10,
-                    endIndent: 10,
-                  ),
-                ),
-              ],
-            ),
-
-            (const SizedBox(height: 20)),
-            Center(
-              child: SizedBox(
-                height: 200,
-                child: PieChart(
-                  PieChartData(
-                    sections: [
-                      PieChartSectionData(
-                        value: 35,
-                        color: Colors.orange,
-                        title: "35%",
-                        radius: 50,
-                      ),
-                      PieChartSectionData(
-                        value: 20,
-                        color: Colors.blue,
-                        title: "20%",
-                        radius: 50,
-                      ),
-                      PieChartSectionData(
-                        value: 45,
-                        color: Colors.green,
-                        title: "45%",
-                        radius: 50,
-                      ),
-                    ],
-                  ),
-                ),
+            Text(
+              "Filter: ${activeFilter.name.toUpperCase()}",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
               ),
             ),
+            const SizedBox(height: 20),
 
-            const SizedBox(height: 80),
-            _row("Total Spent:", "KES 27,200"),
+            // PIE CHART SECTION
+            SizedBox(
+              height: 250,
+              child: categoryData.isEmpty
+                  ? const Center(
+                      child: Text("No expenses recorded for this period"),
+                    )
+                  : PieChart(
+                      PieChartData(
+                        sections: _buildPieSections(categoryData),
+                        centerSpaceRadius: 40,
+                        sectionsSpace: 2,
+                      ),
+                    ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // SUMMARY CARDS
+            _summaryRow(
+              "Total Expenses",
+              "KES ${totalSpent.toStringAsFixed(0)}",
+              Colors.red,
+            ),
             const Divider(),
-            _row("Top Category", "Shopping"),
-            const Divider(),
-            _row("Number of Transactions", "18"),
+            _summaryRow(
+              "Active Categories",
+              "${categoryData.length}",
+              Colors.blue,
+            ),
             const Divider(),
           ],
         ),
@@ -102,16 +71,50 @@ class SummaryScreen extends StatelessWidget {
     );
   }
 
-  Widget _row(String l, String v) {
+  List<PieChartSectionData> _buildPieSections(Map<String, double> data) {
+    final List<Color> colors = [
+      Colors.red,
+      Colors.orange,
+      Colors.purple,
+      Colors.blue,
+      Colors.teal,
+    ];
+    int i = 0;
+
+    return data.entries.map((entry) {
+      final color = colors[i % colors.length];
+      i++;
+      return PieChartSectionData(
+        value: entry.value,
+        title: "${entry.key}\n${entry.value.toStringAsFixed(1)}%",
+        color: color,
+        radius: 60,
+        titleStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _summaryRow(String label, String value, Color color) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(l, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           Text(
-            v,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+            label,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),
