@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/finance_provider.dart';
 
@@ -11,146 +12,265 @@ class AddTransactionScreen extends ConsumerStatefulWidget {
 }
 
 class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
-  // 1. Controllers to capture text input
-  final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _titleController = TextEditingController();
+  final _titleController = TextEditingController();
+  final _amountController = TextEditingController();
 
-  // Default category
-  String _selectedCategory = "Shopping";
+  String _selectedCategory = 'General';
+  bool _isIncome = false;
+
+  final List<Map<String, dynamic>> _categories = [
+    {'name': 'Food', 'icon': Icons.restaurant, 'color': Colors.orange},
+    {'name': 'Transport', 'icon': Icons.directions_bus, 'color': Colors.blue},
+    {'name': 'Shopping', 'icon': Icons.shopping_bag, 'color': Colors.pink},
+    {'name': 'Rent', 'icon': Icons.home, 'color': Colors.brown},
+    {'name': 'Airtime', 'icon': Icons.phone_android, 'color': Colors.teal},
+    {'name': 'Utilities', 'icon': Icons.lightbulb, 'color': Colors.yellow[800]},
+    {'name': 'Health', 'icon': Icons.medical_services, 'color': Colors.red},
+    {'name': 'Family', 'icon': Icons.people, 'color': Colors.purple},
+    {'name': 'Education', 'icon': Icons.school, 'color': Colors.indigo},
+    {'name': 'Entertainment', 'icon': Icons.movie, 'color': Colors.cyan},
+    {'name': 'Savings', 'icon': Icons.savings, 'color': Colors.green},
+    {'name': 'General', 'icon': Icons.category, 'color': Colors.grey},
+  ];
 
   @override
   void dispose() {
-    // 2. Always dispose controllers to prevent memory leaks
-    _amountController.dispose();
     _titleController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
-  void _saveTransaction() {
+  void _saveTransaction() async {
     final String title = _titleController.text.trim();
-    final double? amount = double.tryParse(_amountController.text);
+    final String amountText = _amountController.text.trim();
 
-    // Basic Validation
-    if (title.isEmpty || amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid title and amount")),
-      );
-      return;
-    }
+    if (amountText.isNotEmpty && title.isNotEmpty) {
+      final double? amountValue = double.tryParse(amountText);
 
-    // 3. Call the Provider to save data
-    ref
-        .read(financeProvider.notifier)
-        .addTransaction(
-          title: title,
-          category: _selectedCategory,
-          amount: amount,
-          isIncome: _selectedCategory == "Salary",
+      if (amountValue != null) {
+        ref
+            .read(financeProvider.notifier)
+            .addTransaction(
+              title: title,
+              category: _selectedCategory,
+              amount: amountValue,
+              isIncome: _isIncome,
+            );
+
+        setState(() {
+          _titleController.clear();
+          _amountController.clear();
+          _selectedCategory = 'General';
+          _isIncome = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Success! $title has been recorded."),
+            backgroundColor: const Color(0xFF2E7D32),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
 
-    // 4. Feedback and Navigation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Transaction saved successfully!")),
-    );
+        await Future.delayed(const Duration(milliseconds: 400));
 
-    // Clear fields
-    _titleController.clear();
-    _amountController.clear();
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      }
+    } else {
+      _showErrorSnackBar("Please fill in all fields");
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2E7D32),
         title: const Text(
           "Add Transaction",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        // Added explicit back button check
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.maybePop(context),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Amount Field
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: "Amount",
-                suffixText: "KES",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Category Dropdown
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: InputDecoration(
-                labelText: "Category",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-              ),
-              items: ["Shopping", "Salary", "Transfer", "Food", "Bills"]
-                  .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
-                  .toList(),
-              onChanged: (val) => setState(() => _selectedCategory = val!),
-            ),
-            const SizedBox(height: 20),
-
-            // Title Field
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                labelText: "Note / Title",
-                hintText: "e.g., Monthly Groceries",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-              ),
+            Row(
+              children: [
+                _buildTypeToggle("Expense", !_isIncome, Colors.red),
+                const SizedBox(width: 12),
+                _buildTypeToggle("Income", _isIncome, Colors.green),
+              ],
             ),
             const SizedBox(height: 30),
-
-            // Save Button with Gradient
-            GestureDetector(
-              onTap: _saveTransaction,
-              child: Container(
-                width: double.infinity,
-                height: 55,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+            const Text(
+              "Amount",
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              ],
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(
+                hintText: "0.00",
+                prefixText: "KES ",
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey),
                 ),
-                child: const Center(
-                  child: Text(
-                    "Save Transaction",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 25),
+            const Text(
+              "Description",
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                hintText: "What was this for?",
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 35),
+            const Text(
+              "Select Category",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 15),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _categories.map((cat) {
+                final bool isSelected = _selectedCategory == cat['name'];
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedCategory = cat['name']),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
                     ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF2E7D32)
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          cat['icon'],
+                          size: 18,
+                          color: isSelected ? Colors.white : cat['color'],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          cat['name'],
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black87,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 50),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _saveTransaction,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  "SAVE TRANSACTION",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 20),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeToggle(String label, bool active, Color color) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _isIncome = label == "Income"),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: active ? color.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: active ? color : Colors.grey[300]!,
+              width: 2,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? color : Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ),
       ),
     );
