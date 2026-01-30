@@ -1,115 +1,170 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/finance_provider.dart'; // Make sure this path is correct
+import '../providers/finance_provider.dart';
+import '../providers/auth_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the finance state
+    // Watching providers to react to state changes automatically
     final finance = ref.watch(financeProvider);
-    final transactions = finance.transactions;
+    final auth = ref.watch(authProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2E7D32),
-        title: const Text(
-          "Mobile-Money Tracker",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Balance Cards Section
-            Row(
-              children: [
-                Expanded(
-                  child: _statCard(
-                    "Balance",
-                    "KES ${finance.balance}",
-                    const Color(0xFF1565C0),
+      backgroundColor: Colors.grey[100],
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 200.0,
+            floating: false,
+            pinned: true,
+            elevation: 0,
+            backgroundColor: const Color(0xFF2E7D32),
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: false,
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              title: Text(
+                "KES ${finance.balance.toStringAsFixed(0)}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                ),
+              ),
+              background: Container(
+                padding: const EdgeInsets.only(top: 80, left: 20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _statCard(
-                    "This Month",
-                    "-KES 27,200",
-                    const Color(0xFFC62828),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 25),
-            const Text(
-              "Recent Transactions",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-            ),
-            const SizedBox(height: 10),
-
-            // DYNAMIC LIST SECTION
-            Expanded(
-              child: transactions.isEmpty
-                  ? const Center(child: Text("No transactions yet. Add some!"))
-                  : ListView.builder(
-                      itemCount: transactions.length,
-                      itemBuilder: (context, index) {
-                        final tx = transactions[index];
-                        return _listTile(
-                          tx.title,
-                          tx.category,
-                          tx.amount,
-                          tx.color,
-                        );
-                      },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Welcome, ${auth.userName ?? 'User'}",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                      ),
                     ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Your existing _statCard and _listTile widgets stay the same
-  Widget _statCard(String title, String val, Color col) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: col,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(title, style: const TextStyle(color: Colors.white70)),
-          Text(
-            val,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+                    const SizedBox(height: 4),
+                    const Text(
+                      "Total Balance",
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 25, 20, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Recent Transactions",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text(
+                      "See All",
+                      style: TextStyle(color: Color(0xFF2E7D32)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          finance.transactions.isEmpty
+              ? SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildEmptyState(),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final tx = finance.transactions[index];
+                    return _TransactionCard(
+                      title: tx.title,
+                      category: tx.category,
+                      amount: tx.amount,
+                      color: tx.color,
+                    );
+                  }, childCount: finance.transactions.length),
+                ),
         ],
       ),
     );
   }
 
-  Widget _listTile(String t, String s, String p, Color c) {
-    return Card(
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.receipt_long, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          const Text(
+            "No transactions yet",
+            style: TextStyle(color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TransactionCard extends StatelessWidget {
+  final String title;
+  final String category;
+  final String amount;
+  final Color color;
+
+  const _TransactionCard({
+    required this.title,
+    required this.category,
+    required this.amount,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: ListTile(
-        title: Text(t),
-        subtitle: Text(s),
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.1),
+          child: Icon(Icons.wallet, color: color, size: 20),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(category, style: const TextStyle(fontSize: 12)),
         trailing: Text(
-          p,
-          style: TextStyle(color: c, fontWeight: FontWeight.bold),
+          amount,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
       ),
     );
