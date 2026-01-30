@@ -16,11 +16,8 @@ class TrackerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Listen for logout to jump back to login screen automatically
     ref.listen(authProvider, (previous, next) {
-      if (!next.isAuthenticated) {
-        // Clear navigation stack and go to login
-      }
+      if (!next.isAuthenticated) {}
     });
 
     return MaterialApp(
