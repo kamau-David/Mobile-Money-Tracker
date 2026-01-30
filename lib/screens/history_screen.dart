@@ -7,9 +7,8 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final finance = ref.watch(financeProvider);
-    // We watch the logic-heavy list here
     final transactions = ref.watch(filteredTransactionsProvider);
+    final activeFilter = ref.watch(financeProvider).activeFilter;
 
     return Scaffold(
       appBar: AppBar(
@@ -22,29 +21,34 @@ class HistoryScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // Filter Chips Row
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10.0),
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _filterChip(
+                _buildFilterChip(
                   ref,
                   "1 Day",
                   TransactionFilter.daily,
-                  finance.activeFilter,
+                  activeFilter,
                 ),
-                _filterChip(
+                _buildFilterChip(
                   ref,
                   "7 Days",
                   TransactionFilter.weekly,
-                  finance.activeFilter,
+                  activeFilter,
                 ),
-                _filterChip(
+                _buildFilterChip(
                   ref,
                   "30 Days",
                   TransactionFilter.monthly,
-                  finance.activeFilter,
+                  activeFilter,
+                ),
+                _buildFilterChip(
+                  ref,
+                  "All",
+                  TransactionFilter.all,
+                  activeFilter,
                 ),
               ],
             ),
@@ -56,17 +60,11 @@ class HistoryScreen extends ConsumerWidget {
                     child: Text("No transactions found for this period."),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: transactions.length,
                     itemBuilder: (context, index) {
                       final tx = transactions[index];
-                      return _historyTile(
-                        tx.date,
-                        tx.title,
-                        tx.category,
-                        tx.amount,
-                        tx.color,
-                      );
+                      return _historyTile(tx);
                     },
                   ),
           ),
@@ -75,41 +73,53 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _filterChip(
+  Widget _buildFilterChip(
     WidgetRef ref,
     String label,
     TransactionFilter filter,
-    TransactionFilter active,
+    TransactionFilter current,
   ) {
-    final isSelected = filter == active;
+    final isSelected = filter == current;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
       onSelected: (val) {
-        ref.read(financeProvider.notifier).setFilter(filter);
+        if (val) ref.read(financeProvider.notifier).setFilter(filter);
       },
       selectedColor: const Color(0xFF2E7D32),
       labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
     );
   }
 
-  Widget _historyTile(String d, String t, String f, String a, Color c) {
+  Widget _historyTile(tx) {
     return Card(
-      elevation: 2,
+      elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: c.withOpacity(0.1),
-          child: Text(
-            d.split(' ')[1],
-            style: TextStyle(color: c, fontSize: 12),
+          backgroundColor: tx.color.withOpacity(0.1),
+          child: Icon(
+            tx.amount.contains('+') ? Icons.arrow_upward : Icons.arrow_downward,
+            color: tx.color,
+            size: 18,
           ),
         ),
-        title: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(f),
+        title: Text(
+          tx.title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text("${tx.category} • ${tx.date}"),
         trailing: Text(
-          a,
-          style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 16),
+          tx.amount,
+          style: TextStyle(
+            color: tx.color,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
       ),
     );
