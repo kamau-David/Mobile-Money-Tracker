@@ -1,72 +1,44 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import '../main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  double _opacity = 0;
-  double _scale = 0.5;
-
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    _checkAuth();
+  }
 
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(() {
-          _opacity = 1.0;
-          _scale = 1.0;
-        });
-      }
-    });
-
-    Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainContainer()),
-        );
-      }
-    });
+  void _checkAuth() async {
+    await Future.delayed(const Duration(seconds: 2));
+    final auth = ref.read(authProvider);
+    if (mounted) {
+      Navigator.pushReplacementNamed(
+        context,
+        auth.isAuthenticated ? '/main' : '/login',
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SizedBox.expand(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Color(0xFFE8F5E9)],
-            ),
-          ),
-          child: Center(
-            child: AnimatedScale(
-              scale: _scale,
-              duration: const Duration(milliseconds: 1500),
-              curve: Curves.fastOutSlowIn,
-              child: AnimatedOpacity(
-                opacity: _opacity,
-                duration: const Duration(milliseconds: 1000),
-                child: Image.asset(
-                  'assets/MoneyWise.png',
-
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ),
+    return const Scaffold(
+      backgroundColor: Color(0xFF2E7D32),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.account_balance_wallet, size: 80, color: Colors.white),
+            SizedBox(height: 20),
+            CircularProgressIndicator(color: Colors.white),
+          ],
         ),
       ),
     );
