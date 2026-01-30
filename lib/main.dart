@@ -1,22 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mobile_money_tracker/screens/splash_screen.dart';
+import 'providers/auth_provider.dart';
+import 'screens/login_screen.dart';
+import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/summary_screen.dart';
 import 'screens/history_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() => runApp(const ProviderScope(child: TrackerApp()));
 
-class TrackerApp extends StatelessWidget {
+class TrackerApp extends ConsumerWidget {
   const TrackerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Listen for logout to jump back to login screen automatically
+    ref.listen(authProvider, (previous, next) {
+      if (!next.isAuthenticated) {
+        // Clear navigation stack and go to login
+      }
+    });
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'KES Tracker',
+      theme: ThemeData(
+        scaffoldBackgroundColor: Colors.white,
+        primaryColor: const Color(0xFF2E7D32),
+      ),
       home: const SplashScreen(),
-      theme: ThemeData(scaffoldBackgroundColor: Colors.white),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignupScreen(),
+        '/main': (context) => const MainContainer(),
+      },
     );
   }
 }
@@ -46,6 +65,7 @@ class _MainContainerState extends State<MainContainer> {
         onTap: (val) => setState(() => _index = val),
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF2E7D32),
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.add_circle), label: "Add"),
