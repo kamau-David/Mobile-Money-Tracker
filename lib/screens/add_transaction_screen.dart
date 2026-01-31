@@ -80,33 +80,29 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         }
       }
     } else {
-      _showErrorSnackBar("Please fill in all fields");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in all fields"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           "Add Transaction",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFF2E7D32),
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
-        // Added explicit back button check
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.maybePop(context),
-        ),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -115,9 +111,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           children: [
             Row(
               children: [
-                _buildTypeToggle("Expense", !_isIncome, Colors.red),
+                _buildTypeToggle("Expense", !_isIncome, Colors.red, isDark),
                 const SizedBox(width: 12),
-                _buildTypeToggle("Income", _isIncome, Colors.green),
+                _buildTypeToggle("Income", _isIncome, Colors.green, isDark),
               ],
             ),
             const SizedBox(height: 30),
@@ -133,14 +129,24 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+              decoration: InputDecoration(
                 hintText: "0.00",
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.grey,
+                ),
                 prefixText: "KES ",
-                enabledBorder: UnderlineInputBorder(
+                prefixStyle: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+                enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.grey),
                 ),
-                focusedBorder: UnderlineInputBorder(
+                focusedBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
                 ),
               ),
@@ -152,20 +158,28 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             ),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+              decoration: InputDecoration(
                 hintText: "What was this for?",
-                enabledBorder: UnderlineInputBorder(
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.grey,
+                ),
+                enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.grey),
                 ),
-                focusedBorder: UnderlineInputBorder(
+                focusedBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
                 ),
               ),
             ),
             const SizedBox(height: 35),
-            const Text(
+            Text(
               "Select Category",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: isDark ? Colors.white : Colors.black,
+              ),
             ),
             const SizedBox(height: 15),
             Wrap(
@@ -184,7 +198,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF2E7D32)
-                          : Colors.grey[100],
+                          : (isDark ? Colors.white10 : Colors.grey[100]),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected
@@ -205,7 +219,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                         Text(
                           cat['name'],
                           style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black87,
+                            color: isSelected
+                                ? Colors.white
+                                : (isDark ? Colors.white70 : Colors.black87),
                             fontWeight: isSelected
                                 ? FontWeight.bold
                                 : FontWeight.normal,
@@ -225,6 +241,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                 onPressed: _saveTransaction,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
@@ -233,7 +250,6 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                 child: const Text(
                   "SAVE TRANSACTION",
                   style: TextStyle(
-                    color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.1,
@@ -248,17 +264,19 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     );
   }
 
-  Widget _buildTypeToggle(String label, bool active, Color color) {
+  Widget _buildTypeToggle(String label, bool active, Color color, bool isDark) {
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _isIncome = label == "Income"),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: active ? color.withOpacity(0.1) : Colors.transparent,
+            color: active ? color.withOpacity(0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: active ? color : Colors.grey[300]!,
+              color: active
+                  ? color
+                  : (isDark ? Colors.white12 : Colors.grey[300]!),
               width: 2,
             ),
           ),
@@ -266,7 +284,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: active ? color : Colors.grey[600],
+                color: active
+                    ? color
+                    : (isDark ? Colors.white38 : Colors.grey[600]),
                 fontWeight: FontWeight.bold,
               ),
             ),
