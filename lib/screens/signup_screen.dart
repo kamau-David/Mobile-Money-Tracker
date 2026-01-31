@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../providers/user_provider.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -10,7 +11,6 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
-  // 1. Form Key and Controllers
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -30,7 +30,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     super.dispose();
   }
 
-  // Email Validation Logic
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return 'Email is required';
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
@@ -39,9 +38,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   void _submitData() async {
-    // Triggers all 'validator' functions in the Form
     if (_formKey.currentState!.validate()) {
-      // If valid, proceed to sign up
+      // 1. Save to User Provider (updates UI & SharedPreferences)
+      await ref
+          .read(userProvider.notifier)
+          .updateProfile(
+            _nameController.text.trim(),
+            _emailController.text.trim(),
+          );
+
+      // 2. Authenticate
       await ref
           .read(authProvider.notifier)
           .login(_nameController.text.trim(), _passController.text);
@@ -55,18 +61,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF2E7D32);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 30.0),
         child: Form(
-          key: _formKey, // 🛡️ Form key handles the validation state
+          key: _formKey,
           child: Column(
             children: [
               const SizedBox(height: 10),
@@ -84,23 +90,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   color: primaryGreen,
                 ),
               ),
-              const Text(
+              Text(
                 "Join the KES Tracker community",
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
               ),
               const SizedBox(height: 40),
-
-              // Full Name
               _buildTextFormField(
+                isDark: isDark,
                 controller: _nameController,
                 label: "Full Name",
                 icon: Icons.person,
                 validator: (val) => val!.isEmpty ? 'Name is required' : null,
               ),
               const SizedBox(height: 20),
-
-              // Email with specific regex check
               _buildTextFormField(
+                isDark: isDark,
                 controller: _emailController,
                 label: "Email Address",
                 icon: Icons.email,
@@ -108,9 +112,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 validator: _validateEmail,
               ),
               const SizedBox(height: 20),
-
-              // Phone Number
               _buildTextFormField(
+                isDark: isDark,
                 controller: _phoneController,
                 label: "Phone Number (M-Pesa)",
                 icon: Icons.phone_android,
@@ -120,32 +123,37 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     val!.length < 10 ? 'Enter a valid phone number' : null,
               ),
               const SizedBox(height: 20),
-
-              // Password
               TextFormField(
                 controller: _passController,
                 obscureText: !_isPasswordVisible,
-                decoration: _inputStyle("Password", Icons.lock).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: _inputStyle("Password", Icons.lock, isDark)
+                    .copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: isDark ? Colors.white54 : Colors.grey,
+                        ),
+                        onPressed: () => setState(
+                          () => _isPasswordVisible = !_isPasswordVisible,
+                        ),
+                      ),
                     ),
-                    onPressed: () => setState(
-                      () => _isPasswordVisible = !_isPasswordVisible,
-                    ),
-                  ),
-                ),
                 validator: (val) =>
                     val!.length < 4 ? 'Password too short (min 4)' : null,
               ),
               const SizedBox(height: 20),
-
               TextFormField(
                 controller: _confirmPassController,
                 obscureText: !_isPasswordVisible,
-                decoration: _inputStyle("Confirm Password", Icons.lock_reset),
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: _inputStyle(
+                  "Confirm Password",
+                  Icons.lock_reset,
+                  isDark,
+                ),
                 validator: (val) {
                   if (val != _passController.text)
                     return 'Passwords do not match';
@@ -153,14 +161,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 },
               ),
               const SizedBox(height: 40),
-
-              // Sign Up Button
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -168,15 +175,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   onPressed: _submitData,
                   child: const Text(
                     "SIGN UP",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -184,17 +187,34 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  // Helper for consistent styling
-  InputDecoration _inputStyle(String label, IconData icon, [String? hint]) {
+  // Your helper methods remain the same
+  InputDecoration _inputStyle(
+    String label,
+    IconData icon,
+    bool isDark, [
+    String? hint,
+  ]) {
     return InputDecoration(
       labelText: label,
+      labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
       hintText: hint,
+      hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
       prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : Colors.grey.shade400,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+      ),
     );
   }
 
   Widget _buildTextFormField({
+    required bool isDark,
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -206,7 +226,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
-      decoration: _inputStyle(label, icon, hint),
+      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+      decoration: _inputStyle(label, icon, isDark, hint),
     );
   }
 }

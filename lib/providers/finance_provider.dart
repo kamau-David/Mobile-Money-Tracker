@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/transaction.dart'; // ✅ UPDATED FILENAME
+import '../models/transaction.dart';
 
 enum TransactionFilter { all, daily, weekly, monthly }
 
@@ -107,6 +107,16 @@ class FinanceNotifier extends Notifier<FinanceState> {
     _saveToDisk(updatedTransactions);
   }
 
+  // --- NEW: CLEAR ALL DATA METHOD ---
+  Future<void> clearAllTransactions() async {
+    // 1. Reset the local state
+    state = state.copyWith(balance: 0.0, transactions: []);
+
+    // 2. Clear from disk (SharedPreferences)
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
+
   Future<void> _saveToDisk(List<TransactionModel> list) async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(list.map((tx) => tx.toJson()).toList());
@@ -135,10 +145,11 @@ class FinanceNotifier extends Notifier<FinanceState> {
   }
 }
 
-// --- GLOBAL PROVIDERS ---
 final financeProvider = NotifierProvider<FinanceNotifier, FinanceState>(
   () => FinanceNotifier(),
 );
+
+// --- PROVIDERS FOR FILTERING AND SUMMARY ---
 
 final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
   final finance = ref.watch(financeProvider);

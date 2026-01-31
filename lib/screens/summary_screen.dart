@@ -6,7 +6,6 @@ import '../providers/finance_provider.dart';
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
 
-  // 1. Fixed Color Mapping: Assigns specific colors to categories
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'food':
@@ -41,6 +40,7 @@ class SummaryScreen extends ConsumerWidget {
     final categoryData = ref.watch(categorySpendingProvider);
     final totalSpent = ref.watch(filteredTotalSpentProvider);
     final activeFilter = ref.watch(financeProvider).activeFilter;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -50,6 +50,7 @@ class SummaryScreen extends ConsumerWidget {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -57,48 +58,57 @@ class SummaryScreen extends ConsumerWidget {
           children: [
             Text(
               "Viewing: ${activeFilter.name.toUpperCase()}",
-              style: const TextStyle(
+              style: TextStyle(
                 letterSpacing: 1.2,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: isDark ? Colors.white54 : Colors.grey,
               ),
             ),
-            const SizedBox(height: 50), // Increased height to give labels room
-            // --- PIE CHART SECTION ---
+            const SizedBox(height: 50),
             SizedBox(
-              height: 300, // Slightly taller to accommodate external labels
+              height: 300,
               child: categoryData.isEmpty
-                  ? const Center(
-                      child: Text("No expense data for this period."),
+                  ? Center(
+                      child: Text(
+                        "No expense data for this period.",
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
                     )
                   : PieChart(
                       PieChartData(
-                        sections: _buildSections(categoryData),
+                        sections: _buildSections(categoryData, isDark),
                         centerSpaceRadius: 40,
-                        sectionsSpace: 4, // More space between slices
+                        sectionsSpace: 4,
                         pieTouchData: PieTouchData(enabled: true),
                       ),
                     ),
             ),
-
             const SizedBox(height: 50),
-
             _dataCard(
+              context,
               "Total Expenses",
               "KES ${totalSpent.toStringAsFixed(0)}",
               Colors.red,
+              isDark,
             ),
             const SizedBox(height: 15),
-            _dataCard("Categories", "${categoryData.length}", Colors.blue),
-
+            _dataCard(
+              context,
+              "Categories",
+              "${categoryData.length}",
+              Colors.blue,
+              isDark,
+            ),
             const SizedBox(height: 30),
-            const Text(
+            Text(
               "Note: Only negative transactions (expenses) are shown.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
-                color: Colors.grey,
+                color: isDark ? Colors.white38 : Colors.grey,
               ),
             ),
           ],
@@ -107,41 +117,47 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
-  List<PieChartSectionData> _buildSections(Map<String, double> data) {
+  List<PieChartSectionData> _buildSections(
+    Map<String, double> data,
+    bool isDark,
+  ) {
     return data.entries.map((entry) {
       final color = _getCategoryColor(entry.key);
-
       return PieChartSectionData(
         value: entry.value,
         showTitle: false,
         color: color,
         radius: 55,
-
-        badgeWidget: _buildExternalLabel(entry.key, entry.value, color),
+        badgeWidget: _buildExternalLabel(entry.key, entry.value, color, isDark),
         badgePositionPercentageOffset: 1.5,
       );
     }).toList();
   }
 
-  Widget _buildExternalLabel(String label, double value, Color color) {
+  Widget _buildExternalLabel(
+    String label,
+    double value,
+    Color color,
+    bool isDark,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(width: 2, height: 12, color: color.withOpacity(0.6)),
-        // The Label Content
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(6),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
+              if (!isDark)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
             ],
-            border: Border.all(color: color, width: 1),
+            border: Border.all(color: color.withOpacity(0.5), width: 1),
           ),
           child: Text(
             "$label\n${value.toStringAsFixed(0)}%",
@@ -157,22 +173,34 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _dataCard(String title, String value, Color color) {
+  Widget _dataCard(
+    BuildContext context,
+    String title,
+    String value,
+    Color color,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          if (!isDark)
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
         ],
+        border: isDark ? Border.all(color: Colors.white10) : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
           ),
           Text(
             value,
