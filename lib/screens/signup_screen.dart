@@ -39,7 +39,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   void _submitData() async {
     if (_formKey.currentState!.validate()) {
-      // 1. Save to User Provider (updates UI & SharedPreferences)
       await ref
           .read(userProvider.notifier)
           .updateProfile(
@@ -47,7 +46,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             _emailController.text.trim(),
           );
 
-      // 2. Authenticate
       await ref
           .read(authProvider.notifier)
           .login(_nameController.text.trim(), _passController.text);
@@ -154,11 +152,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   Icons.lock_reset,
                   isDark,
                 ),
-                validator: (val) {
-                  if (val != _passController.text)
-                    return 'Passwords do not match';
-                  return null;
-                },
+                validator: (val) => val != _passController.text
+                    ? 'Passwords do not match'
+                    : null,
               ),
               const SizedBox(height: 40),
               SizedBox(
@@ -187,7 +183,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  // Your helper methods remain the same
   InputDecoration _inputStyle(
     String label,
     IconData icon,
@@ -209,6 +204,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
       ),
     );
   }
