@@ -19,10 +19,12 @@ class ProfileScreen extends ConsumerWidget {
           "Profile Details",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
         children: [
+          // Your signature Green Header
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(
@@ -58,6 +60,8 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
+
+          // Immutable Data Tiles
           _buildImmutableInfoTile(
             label: "Full Name",
             value: userData.name,
@@ -70,21 +74,22 @@ class ProfileScreen extends ConsumerWidget {
             icon: Icons.email_outlined,
             isDark: isDark,
           ),
-          // New Immutable Account ID Tile
           _buildImmutableInfoTile(
             label: "Account ID",
             value: userData.userId,
             icon: Icons.fingerprint,
             isDark: isDark,
           ),
-          // New Immutable Join Date Tile
           _buildImmutableInfoTile(
             label: "Member Since",
             value: userData.memberSince,
             icon: Icons.calendar_today_outlined,
             isDark: isDark,
           ),
+
           const Spacer(),
+
+          // Bottom Footer
           const Padding(
             padding: EdgeInsets.all(20.0),
             child: Text(
