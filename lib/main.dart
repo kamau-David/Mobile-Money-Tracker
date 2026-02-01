@@ -18,7 +18,6 @@ class TrackerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Watch the theme state
     final themeMode = ref.watch(themeProvider);
 
     ref.listen(authProvider, (previous, next) {
@@ -29,10 +28,8 @@ class TrackerApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       title: 'KES Tracker',
 
-      // 2. Link the themeMode from our provider
       themeMode: themeMode,
 
-      // 3. Define the Light Theme
       theme: ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: Colors.white,
@@ -43,18 +40,15 @@ class TrackerApp extends ConsumerWidget {
         ),
       ),
 
-      // 4. Define the Dark Theme
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: const Color(0xFF2E7D32),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(
-            0xFF1B5E20,
-          ), // Slightly deeper green for dark mode
+          backgroundColor: Color(0xFF1B5E20),
           foregroundColor: Colors.white,
         ),
-        // Ensures bottom nav bars look good in dark mode
+
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Color(0xFF1E1E1E),
         ),
@@ -64,6 +58,7 @@ class TrackerApp extends ConsumerWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
+
         '/main': (context) => const MainContainer(),
       },
     );
