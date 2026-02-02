@@ -42,3 +42,4 @@ linux/flutter/ephemeral/
 # OS
 .DS_Store
 Thumbs.db
+android/.kotlin/ 
