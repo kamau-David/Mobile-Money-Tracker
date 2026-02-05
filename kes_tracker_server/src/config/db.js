@@ -11,6 +11,17 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-console.log('Database Pool Created ✅');
+
+
+(async () => {
+    try {
+        const connection = await pool.getConnection();
+        console.log('✅ Successfully connected to the KES Tracker Database.');
+        connection.release(); 
+    } catch (err) {
+        console.error('❌ Database connection failed:', err.message);
+    }
+})();
 
 module.exports = pool;
+
