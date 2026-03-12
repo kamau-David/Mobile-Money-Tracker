@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { connectDB } = require("./config/db");
+const cors = require("cors");
 const smsRoutes = require("./routes/smsRoutes"); // 1. Clean import
 
 const app = express();
@@ -10,6 +11,7 @@ connectDB();
 
 // Middleware
 app.use(express.json());
+app.use(cors());
 
 // Basic Health Check (Optional but helpful)
 app.get("/", (req, res) => {
