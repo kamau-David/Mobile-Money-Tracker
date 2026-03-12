@@ -11,7 +11,14 @@ exports.parseAndSaveSMS = async (req, res) => {
       model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     });
 
-    const prompt = `Extract Amount (number only), Merchant, Category, and Type (income/expense) from: "${smsText}". Return JSON only.`;
+    const prompt = `Analyze this M-Pesa SMS: "${smsText}". 
+    Extract the following fields into JSON:
+    1. transaction_id: The unique M-Pesa code (e.g., RDK25GHT6).
+    2. amount: Number only.
+    3. merchant: Sender name if money received, receiver name if money paid.
+    4. category: Spending/Income category.
+    5. type: Strictly "income" if money is received, "expense" if money is paid or sent.
+    Return JSON only.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -28,12 +35,15 @@ exports.parseAndSaveSMS = async (req, res) => {
 
     const merchant = parsedData.merchant || parsedData.Merchant || "Unknown";
     const category = parsedData.category || "General";
-    const type = (parsedData.type || "expense").toLowerCase();
+
+    const rawType = (parsedData.type || "expense").toLowerCase();
+    const type = rawType === "income" ? "income" : "expense";
 
     const needsClarification =
       category === "Others" || merchant.includes("07") || isNaN(cleanAmount);
 
     const savedTransaction = await Transaction.create({
+      transactionId: parsedData.transaction_id || parsedData.Transaction_Id,
       amount: cleanAmount,
       merchant: merchant,
       category: category,
@@ -41,6 +51,13 @@ exports.parseAndSaveSMS = async (req, res) => {
       smsRaw: smsText,
       needsClarification: needsClarification,
     });
+
+    if (!savedTransaction) {
+      return res.status(409).json({
+        message: "Transaction already exists",
+        transactionId: parsedData.transaction_id,
+      });
+    }
 
     res.status(201).json(savedTransaction);
   } catch (error) {
