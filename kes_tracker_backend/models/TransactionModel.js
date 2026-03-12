@@ -3,10 +3,13 @@ const { pool } = require("../config/db");
 const Transaction = {
   create: async (data) => {
     const query = `
-      INSERT INTO transactions (amount, merchant, category, type, sms_raw, needs_clarification)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+      INSERT INTO transactions (transaction_id, amount, merchant, category, type, sms_raw, needs_clarification)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (transaction_id) DO NOTHING
+      RETURNING *;
     `;
     const values = [
+      data.transactionId,
       data.amount,
       data.merchant,
       data.category,
@@ -47,4 +50,3 @@ const Transaction = {
 };
 
 module.exports = Transaction;
- 
