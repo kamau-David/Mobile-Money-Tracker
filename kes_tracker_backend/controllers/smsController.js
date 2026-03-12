@@ -7,8 +7,11 @@ exports.parseAndSaveSMS = async (req, res) => {
   try {
     const { smsText } = req.body;
 
+    // 1. Get the userId from the request (attached by your Auth Middleware)
+    const userId = req.user;
+
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     });
 
     const prompt = `Analyze this M-Pesa SMS: "${smsText}". 
@@ -32,17 +35,17 @@ exports.parseAndSaveSMS = async (req, res) => {
 
     const rawAmount = parsedData.amount || parsedData.Amount || 0;
     const cleanAmount = parseFloat(String(rawAmount).replace(/[^0-9.]/g, ""));
-
     const merchant = parsedData.merchant || parsedData.Merchant || "Unknown";
     const category = parsedData.category || "General";
-
     const rawType = (parsedData.type || "expense").toLowerCase();
     const type = rawType === "income" ? "income" : "expense";
 
     const needsClarification =
       category === "Others" || merchant.includes("07") || isNaN(cleanAmount);
 
+    // 2. Pass the userId to the Transaction model so it's saved in the DB
     const savedTransaction = await Transaction.create({
+      userId: userId, // <--- New Field
       transactionId: parsedData.transaction_id || parsedData.Transaction_Id,
       amount: cleanAmount,
       merchant: merchant,
@@ -71,7 +74,8 @@ exports.parseAndSaveSMS = async (req, res) => {
 
 exports.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.findAll();
+    // 3. Only fetch transactions for the logged-in user
+    const transactions = await Transaction.findAll(req.user);
     res.status(200).json(transactions);
   } catch (error) {
     console.error("Fetch Error:", error);
@@ -81,7 +85,8 @@ exports.getAllTransactions = async (req, res) => {
 
 exports.getFinanceSummary = async (req, res) => {
   try {
-    const summary = await Transaction.getSummary();
+    // 4. Calculate summary specifically for this user
+    const summary = await Transaction.getSummary(req.user);
     res.status(200).json(summary);
   } catch (error) {
     console.error("Summary Error:", error);
