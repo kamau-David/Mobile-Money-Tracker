@@ -121,3 +121,31 @@ exports.getFinanceSummary = async (req, res) => {
     res.status(500).json({ error: "Failed to calculate summary" });
   }
 };
+
+// 4. UPDATE TRANSACTION (For user clarifications)
+exports.updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category } = req.body;
+    const userId = req.user;
+
+    // Update the transaction in the DB
+    // We flip needsClarification to false because the user just clarified it!
+    const updated = await Transaction.update(id, userId, {
+      category: category,
+      needsClarification: false,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    res.status(200).json({
+      message: "Transaction updated successfully",
+      transaction: updated,
+    });
+  } catch (error) {
+    console.error("Update Error:", error);
+    res.status(500).json({ error: "Failed to update transaction" });
+  }
+};

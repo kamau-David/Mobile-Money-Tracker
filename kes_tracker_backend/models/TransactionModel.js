@@ -1,7 +1,7 @@
 const { pool } = require("../config/db");
 
 const Transaction = {
-  // 1. Create: Now includes user_id
+  // 1. Create: Linked to the logged-in user
   create: async (data) => {
     const query = `
       INSERT INTO transactions (user_id, transaction_id, amount, merchant, category, type, sms_raw, needs_clarification)
@@ -10,7 +10,7 @@ const Transaction = {
       RETURNING *;
     `;
     const values = [
-      data.userId, // <--- Linked to the logged-in user
+      data.userId,
       data.transactionId,
       data.amount,
       data.merchant,
@@ -23,7 +23,7 @@ const Transaction = {
     return rows[0];
   },
 
-  // 2. FindAll: Now filters by userId
+  // 2. FindAll: Filters by userId
   findAll: async (userId) => {
     const query =
       "SELECT * FROM transactions WHERE user_id = $1 ORDER BY created_at DESC;";
@@ -31,7 +31,7 @@ const Transaction = {
     return rows;
   },
 
-  // 3. GetSummary: Now calculates only for the specific user
+  // 3. GetSummary: Aggregates totals for the specific user
   getSummary: async (userId) => {
     const query = `
       SELECT 
@@ -52,6 +52,23 @@ const Transaction = {
       totalExpense: totalExpense,
       currentBalance: balance,
     };
+  },
+
+  // 4. NEW: Update method for user clarifications
+  update: async (id, userId, updates) => {
+    const { category, needsClarification } = updates;
+
+    // We filter by BOTH id and user_id so one user can't edit another's data
+    const query = `
+      UPDATE transactions 
+      SET category = $1, needs_clarification = $2 
+      WHERE id = $3 AND user_id = $4 
+      RETURNING *;
+    `;
+
+    const values = [category, needsClarification, id, userId];
+    const { rows } = await pool.query(query, values);
+    return rows[0];
   },
 };
 
