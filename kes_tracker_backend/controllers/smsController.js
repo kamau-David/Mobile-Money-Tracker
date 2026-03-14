@@ -3,24 +3,24 @@ const Transaction = require("../models/TransactionModel");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// 1. MAIN PARSER
 exports.parseAndSaveSMS = async (req, res) => {
   try {
     const { smsText } = req.body;
-
-    // 1. Get the userId from the request (attached by your Auth Middleware)
     const userId = req.user;
 
     const model = genAI.getGenerativeModel({
       model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     });
 
-    const prompt = `Analyze this M-Pesa SMS: "${smsText}". 
+    const prompt = `Analyze this Kenyan M-Pesa SMS: "${smsText}". 
     Extract the following fields into JSON:
     1. transaction_id: The unique M-Pesa code (e.g., RDK25GHT6).
     2. amount: Number only.
-    3. merchant: Sender name if money received, receiver name if money paid.
-    4. category: Spending/Income category.
-    5. type: Strictly "income" if money is received, "expense" if money is paid or sent.
+    3. merchant: The recipient or sender name. If Paybill/Till, use the Business Name.
+    4. category: Contextual category (e.g., Food, Utilities, Transport, Income, Shopping).
+    5. type: Strictly "income" for: Received, Deposit, Reversed. 
+             Strictly "expense" for: Paid, Sent, Bought, Withdraw, Paybill, Till.
     Return JSON only.`;
 
     const result = await model.generateContent(prompt);
@@ -33,19 +33,48 @@ exports.parseAndSaveSMS = async (req, res) => {
     );
     const parsedData = JSON.parse(jsonString);
 
-    const rawAmount = parsedData.amount || parsedData.Amount || 0;
+    const rawAmount = parsedData.amount || 0;
     const cleanAmount = parseFloat(String(rawAmount).replace(/[^0-9.]/g, ""));
-    const merchant = parsedData.merchant || parsedData.Merchant || "Unknown";
+    const merchant = parsedData.merchant || "Unknown";
     const category = parsedData.category || "General";
-    const rawType = (parsedData.type || "expense").toLowerCase();
-    const type = rawType === "income" ? "income" : "expense";
+
+    const lowerSMS = smsText.toLowerCase();
+    let type = (parsedData.type || "expense").toLowerCase();
+
+    const expenseKeywords = [
+      "paid",
+      "sent",
+      "bought",
+      "withdraw",
+      "paybill",
+      "buy goods",
+    ];
+    const incomeKeywords = ["received", "deposited", "reversed"];
+
+    if (expenseKeywords.some((word) => lowerSMS.includes(word))) {
+      type = "expense";
+    } else if (incomeKeywords.some((word) => lowerSMS.includes(word))) {
+      type = "income";
+    }
+
+    // --- ENHANCED CLARIFICATION LOGIC ---
+    // Check if the merchant name extracted is actually a phone number
+    const isPhoneNumber = /^(07|01|\+254)\d{8}$/.test(
+      merchant.replace(/\s/g, ""),
+    );
+
+    // Check if the SMS contains Pochi la Biashara keywords
+    const isPochi = lowerSMS.includes("pochi la biashara");
 
     const needsClarification =
-      category === "Others" || merchant.includes("07") || isNaN(cleanAmount);
+      category === "Others" ||
+      category === "General" ||
+      isPhoneNumber ||
+      isPochi ||
+      isNaN(cleanAmount);
 
-    // 2. Pass the userId to the Transaction model so it's saved in the DB
     const savedTransaction = await Transaction.create({
-      userId: userId, // <--- New Field
+      userId: userId,
       transactionId: parsedData.transaction_id || parsedData.Transaction_Id,
       amount: cleanAmount,
       merchant: merchant,
@@ -65,16 +94,15 @@ exports.parseAndSaveSMS = async (req, res) => {
     res.status(201).json(savedTransaction);
   } catch (error) {
     console.error("Controller Error:", error);
-    res.status(500).json({
-      error: "Processing failed",
-      details: error.message,
-    });
+    res
+      .status(500)
+      .json({ error: "Processing failed", details: error.message });
   }
 };
 
+// 2. FETCH ALL
 exports.getAllTransactions = async (req, res) => {
   try {
-    // 3. Only fetch transactions for the logged-in user
     const transactions = await Transaction.findAll(req.user);
     res.status(200).json(transactions);
   } catch (error) {
@@ -83,9 +111,9 @@ exports.getAllTransactions = async (req, res) => {
   }
 };
 
+// 3. SUMMARY
 exports.getFinanceSummary = async (req, res) => {
   try {
-    // 4. Calculate summary specifically for this user
     const summary = await Transaction.getSummary(req.user);
     res.status(200).json(summary);
   } catch (error) {
