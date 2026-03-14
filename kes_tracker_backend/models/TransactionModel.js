@@ -23,7 +23,7 @@ const Transaction = {
     return rows[0];
   },
 
-  // 2. FindAll: Filters by userId
+  // 2. FindAll
   findAll: async (userId) => {
     const query =
       "SELECT * FROM transactions WHERE user_id = $1 ORDER BY created_at DESC;";
@@ -31,7 +31,7 @@ const Transaction = {
     return rows;
   },
 
-  // 3. GetSummary: Aggregates totals for the specific user
+  // 3. GetSummary
   getSummary: async (userId) => {
     const query = `
       SELECT 
@@ -42,46 +42,38 @@ const Transaction = {
     `;
     const { rows } = await pool.query(query, [userId]);
     const totals = rows[0];
-
     const totalIncome = parseFloat(totals.total_income || 0);
     const totalExpense = parseFloat(totals.total_expense || 0);
-    const balance = totalIncome - totalExpense;
-
     return {
-      totalIncome: totalIncome,
-      totalExpense: totalExpense,
-      currentBalance: balance,
+      totalIncome,
+      totalExpense,
+      currentBalance: totalIncome - totalExpense,
     };
   },
 
-  // 4. Update method for user clarifications
+  // 4. Update
   update: async (id, userId, updates) => {
     const { category, needsClarification } = updates;
-
     const query = `
       UPDATE transactions 
       SET category = $1, needs_clarification = $2 
       WHERE id = $3 AND user_id = $4 
       RETURNING *;
     `;
-
     const values = [category, needsClarification, id, userId];
     const { rows } = await pool.query(query, values);
     return rows[0];
   },
 
-  // 5. FindPending: Get transactions needing review
+  // 5. FindPending
   findPending: async (userId) => {
-    const query = `
-      SELECT * FROM transactions 
-      WHERE user_id = $1 AND needs_clarification = true 
-      ORDER BY created_at DESC;
-    `;
+    const query =
+      "SELECT * FROM transactions WHERE user_id = $1 AND needs_clarification = true ORDER BY created_at DESC;";
     const { rows } = await pool.query(query, [userId]);
     return rows;
   },
 
-  // 6. GetCategoryTotals: For chart data
+  // 6. GetCategoryTotals
   getCategoryTotals: async (userId) => {
     const query = `
       SELECT category, SUM(amount) as total 
@@ -93,16 +85,12 @@ const Transaction = {
     return rows;
   },
 
-  // 7. Search: Find transactions by keyword
+  // 7. Search
   search: async (userId, searchTerm) => {
     const query = `
       SELECT * FROM transactions 
       WHERE user_id = $1 
-      AND (
-        merchant ILIKE $2 OR 
-        category ILIKE $2 OR 
-        transaction_id ILIKE $2
-      )
+      AND (merchant ILIKE $2 OR category ILIKE $2 OR transaction_id ILIKE $2)
       ORDER BY created_at DESC;
     `;
     const values = [userId, `%${searchTerm}%`];
@@ -110,7 +98,7 @@ const Transaction = {
     return rows;
   },
 
-  // 8. Filter by Date: Get transactions for a specific period
+  // 8. Filter by Date
   filterByDate: async (userId, startDate, endDate) => {
     const query = `
       SELECT * FROM transactions 
@@ -118,13 +106,12 @@ const Transaction = {
       AND created_at BETWEEN $2 AND $3
       ORDER BY created_at DESC;
     `;
-    // We expect dates in YYYY-MM-DD format
     const values = [userId, startDate, endDate];
     const { rows } = await pool.query(query, values);
     return rows;
   },
 
-  // 9. Universal Filter: For reports
+  // 9. Universal Filter (Updated for PDF Reports)
   findForReport: async (userId, filters) => {
     let query = "SELECT * FROM transactions WHERE user_id = $1";
     const values = [userId];
@@ -140,11 +127,28 @@ const Transaction = {
       paramIndex += 2;
     }
     if (filters.transactionId) {
-      query += ` AND transaction_id = $${paramIndex++}`;
+      query += ` AND id = $${paramIndex++}`; // Using internal ID for precise single reports
       values.push(filters.transactionId);
     }
 
-    query += " ORDER BY created_at DESC;";
+    query += " ORDER BY created_at ASC;"; // ASC is better for drawing charts (left to right)
+    const { rows } = await pool.query(query, values);
+    return rows;
+  },
+
+  // 10. NEW: Get Daily Trends (Directly for the PDF Line Chart)
+  getDailyTrends: async (userId, startDate, endDate) => {
+    const query = `
+      SELECT 
+        DATE(created_at) as date,
+        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
+      FROM transactions
+      WHERE user_id = $1 AND created_at BETWEEN $2 AND $3
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC;
+    `;
+    const values = [userId, startDate, endDate];
     const { rows } = await pool.query(query, values);
     return rows;
   },
