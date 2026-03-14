@@ -8,9 +8,7 @@ exports.getUpcomingReminders = async (req, res) => {
     const today = new Date();
     const currentDay = today.getDate();
 
-    // 1. Fetch "Expected" bills from the DB (e.g., Rent due on the 5th)
-    // For now, let's assume we have a list.
-    // In a real app, David would have tagged a past transaction as "Recurring".
+    // 1. Fetch "Expected" bills from the DB 
     const bills = await pool.query("SELECT * FROM bills WHERE user_id = $1", [
       userId,
     ]);
@@ -23,7 +21,7 @@ exports.getUpcomingReminders = async (req, res) => {
         bill.due_date_day > currentDay &&
         bill.due_date_day <= currentDay + 3
       ) {
-        // Use Gemini to craft a "Human" message
+        
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `David has a recurring bill for ${bill.merchant_name} (KES ${bill.amount_expected}) due on the ${bill.due_date_day}th. 
         It's now the ${currentDay}th and he hasn't paid it yet. 
