@@ -31,6 +31,19 @@ const Goal = {
     const { rows } = await pool.query(query, [userId]);
     return rows[0];
   },
+
+  updateProgress: async (goalId, userId, amount) => {
+    const query = `
+      UPDATE goals 
+      SET current_saved = current_saved + $1,
+          is_completed = (current_saved + $1 >= target_amount)
+      WHERE id = $2 AND user_id = $3
+      RETURNING *;
+    `;
+    const values = [amount, goalId, userId];
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+  },
 };
 
 module.exports = Goal;

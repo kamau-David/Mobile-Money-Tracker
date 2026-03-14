@@ -1,9 +1,10 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Transaction = require("../models/TransactionModel");
+const Goal = require("../models/GoalModel");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 1. MAIN PARSER (Updated to capture post_balance)
+// 1. MAIN PARSER (Upgraded with Goal Suggestions)
 exports.parseAndSaveSMS = async (req, res) => {
   try {
     const { smsText } = req.body;
@@ -13,15 +14,14 @@ exports.parseAndSaveSMS = async (req, res) => {
       model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     });
 
-    // Updated Prompt to capture balance and Fuliza status
     const prompt = `Analyze this Kenyan M-Pesa SMS: "${smsText}". 
     Extract the following fields into JSON:
-    1. transaction_id: The unique M-Pesa code (e.g., RDK25GHT6).
+    1. transaction_id: The unique M-Pesa code.
     2. amount: Number only.
     3. merchant: The recipient or sender name. If Paybill/Till, use the Business Name.
     4. category: Contextual category (e.g., Food, Utilities, Transport, Income, Shopping).
     5. type: Strictly "income" or "expense".
-    6. post_balance: The "New M-Pesa balance" mentioned at the end (Number only).
+    6. post_balance: The "New M-Pesa balance" mentioned (Number only).
     7. is_fuliza: Boolean, true if Fuliza was used.
     Return JSON only.`;
 
@@ -63,11 +63,9 @@ exports.parseAndSaveSMS = async (req, res) => {
       type = "income";
     }
 
-    // --- ENHANCED CLARIFICATION LOGIC (Preserved) ---
     const isPhoneNumber = /^(07|01|\+254)\d{8}$/.test(
       merchant.replace(/\s/g, ""),
     );
-
     const isPochi = lowerSMS.includes("pochi la biashara");
 
     const needsClarification =
@@ -77,7 +75,7 @@ exports.parseAndSaveSMS = async (req, res) => {
       isPochi ||
       isNaN(cleanAmount);
 
-    // Save to Database (including the new postBalance field)
+    // Save to Database
     const savedTransaction = await Transaction.create({
       userId: userId,
       transactionId: parsedData.transaction_id || parsedData.Transaction_Id,
@@ -86,7 +84,7 @@ exports.parseAndSaveSMS = async (req, res) => {
       category: category,
       type: type,
       smsRaw: smsText,
-      postBalance: cleanBalance, // New field added
+      postBalance: cleanBalance,
       needsClarification: needsClarification,
     });
 
@@ -97,7 +95,34 @@ exports.parseAndSaveSMS = async (req, res) => {
       });
     }
 
-    res.status(201).json(savedTransaction);
+    // --- GOAL SUGGESTION LOGIC ---
+    let goalSuggestion = null;
+
+    if (type === "income" && cleanAmount > 0) {
+      const activeGoals = await Goal.findByUser(userId);
+
+      if (activeGoals && activeGoals.length > 0) {
+        // Pick the first incomplete goal
+        const topGoal =
+          activeGoals.find((g) => !g.is_completed) || activeGoals[0];
+        const remaining =
+          parseFloat(topGoal.target_amount) - parseFloat(topGoal.current_saved);
+
+        goalSuggestion = {
+          goalId: topGoal.id,
+          goalName: topGoal.goal_name,
+          suggestedAmount: Math.floor(cleanAmount * 0.2), // Suggest 20%
+          message: `Nice! You received KES ${cleanAmount}. Should we put some toward your "${topGoal.goal_name}" goal? You still need KES ${remaining.toFixed(2)}.`,
+        };
+      }
+    }
+
+    // Return transaction and the new suggestion object
+    res.status(201).json({
+      success: true,
+      transaction: savedTransaction,
+      suggestion: goalSuggestion,
+    });
   } catch (error) {
     console.error("Controller Error:", error);
     res
@@ -106,7 +131,7 @@ exports.parseAndSaveSMS = async (req, res) => {
   }
 };
 
-// 2. FETCH ALL (Preserved)
+// 2. FETCH ALL
 exports.getAllTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.findAll(req.user);
@@ -117,7 +142,7 @@ exports.getAllTransactions = async (req, res) => {
   }
 };
 
-// 3. SUMMARY (Preserved)
+// 3. SUMMARY
 exports.getFinanceSummary = async (req, res) => {
   try {
     const summary = await Transaction.getSummary(req.user);
@@ -128,7 +153,7 @@ exports.getFinanceSummary = async (req, res) => {
   }
 };
 
-// 4. UPDATE TRANSACTION (Preserved)
+// 4. UPDATE TRANSACTION
 exports.updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
@@ -154,7 +179,7 @@ exports.updateTransaction = async (req, res) => {
   }
 };
 
-// 5. PENDING (Preserved)
+// 5. PENDING
 exports.getPendingClarifications = async (req, res) => {
   try {
     const transactions = await Transaction.findPending(req.user);
@@ -164,7 +189,7 @@ exports.getPendingClarifications = async (req, res) => {
   }
 };
 
-// 6. CATEGORY BREAKDOWN (Preserved)
+// 6. CATEGORY BREAKDOWN
 exports.getCategoryBreakdown = async (req, res) => {
   try {
     const totals = await Transaction.getCategoryTotals(req.user);
@@ -174,7 +199,7 @@ exports.getCategoryBreakdown = async (req, res) => {
   }
 };
 
-// 7. SEARCH (Preserved)
+// 7. SEARCH
 exports.searchTransactions = async (req, res) => {
   try {
     const { q } = req.query;
@@ -190,7 +215,7 @@ exports.searchTransactions = async (req, res) => {
   }
 };
 
-// 8. DATE FILTER (Preserved)
+// 8. DATE FILTER
 exports.getTransactionsByDate = async (req, res) => {
   try {
     const { start, end } = req.query;
