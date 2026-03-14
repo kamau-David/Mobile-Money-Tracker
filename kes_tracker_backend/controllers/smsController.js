@@ -3,7 +3,7 @@ const Transaction = require("../models/TransactionModel");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 1. MAIN PARSER
+// 1. MAIN PARSER (Updated to capture post_balance)
 exports.parseAndSaveSMS = async (req, res) => {
   try {
     const { smsText } = req.body;
@@ -13,20 +13,23 @@ exports.parseAndSaveSMS = async (req, res) => {
       model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     });
 
+    // Updated Prompt to capture balance and Fuliza status
     const prompt = `Analyze this Kenyan M-Pesa SMS: "${smsText}". 
     Extract the following fields into JSON:
     1. transaction_id: The unique M-Pesa code (e.g., RDK25GHT6).
     2. amount: Number only.
     3. merchant: The recipient or sender name. If Paybill/Till, use the Business Name.
     4. category: Contextual category (e.g., Food, Utilities, Transport, Income, Shopping).
-    5. type: Strictly "income" for: Received, Deposit, Reversed. 
-             Strictly "expense" for: Paid, Sent, Bought, Withdraw, Paybill, Till.
+    5. type: Strictly "income" or "expense".
+    6. post_balance: The "New M-Pesa balance" mentioned at the end (Number only).
+    7. is_fuliza: Boolean, true if Fuliza was used.
     Return JSON only.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
+    // Securely extract JSON from AI response
     const jsonString = text.substring(
       text.indexOf("{"),
       text.lastIndexOf("}") + 1,
@@ -35,6 +38,9 @@ exports.parseAndSaveSMS = async (req, res) => {
 
     const rawAmount = parsedData.amount || 0;
     const cleanAmount = parseFloat(String(rawAmount).replace(/[^0-9.]/g, ""));
+    const cleanBalance =
+      parseFloat(String(parsedData.post_balance).replace(/[^0-9.]/g, "")) ||
+      null;
     const merchant = parsedData.merchant || "Unknown";
     const category = parsedData.category || "General";
 
@@ -57,13 +63,11 @@ exports.parseAndSaveSMS = async (req, res) => {
       type = "income";
     }
 
-    // --- ENHANCED CLARIFICATION LOGIC ---
-    // Check if the merchant name extracted is actually a phone number
+    // --- ENHANCED CLARIFICATION LOGIC (Preserved) ---
     const isPhoneNumber = /^(07|01|\+254)\d{8}$/.test(
       merchant.replace(/\s/g, ""),
     );
 
-    // Check if the SMS contains Pochi la Biashara keywords
     const isPochi = lowerSMS.includes("pochi la biashara");
 
     const needsClarification =
@@ -73,6 +77,7 @@ exports.parseAndSaveSMS = async (req, res) => {
       isPochi ||
       isNaN(cleanAmount);
 
+    // Save to Database (including the new postBalance field)
     const savedTransaction = await Transaction.create({
       userId: userId,
       transactionId: parsedData.transaction_id || parsedData.Transaction_Id,
@@ -81,6 +86,7 @@ exports.parseAndSaveSMS = async (req, res) => {
       category: category,
       type: type,
       smsRaw: smsText,
+      postBalance: cleanBalance, // New field added
       needsClarification: needsClarification,
     });
 
@@ -100,7 +106,7 @@ exports.parseAndSaveSMS = async (req, res) => {
   }
 };
 
-// 2. FETCH ALL
+// 2. FETCH ALL (Preserved)
 exports.getAllTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.findAll(req.user);
@@ -111,7 +117,7 @@ exports.getAllTransactions = async (req, res) => {
   }
 };
 
-// 3. SUMMARY
+// 3. SUMMARY (Preserved)
 exports.getFinanceSummary = async (req, res) => {
   try {
     const summary = await Transaction.getSummary(req.user);
@@ -122,15 +128,13 @@ exports.getFinanceSummary = async (req, res) => {
   }
 };
 
-// 4. UPDATE TRANSACTION (For user clarifications)
+// 4. UPDATE TRANSACTION (Preserved)
 exports.updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
     const { category } = req.body;
     const userId = req.user;
 
-    // Update the transaction in the DB
-    // We flip needsClarification to false because the user just clarified it!
     const updated = await Transaction.update(id, userId, {
       category: category,
       needsClarification: false,
@@ -150,7 +154,7 @@ exports.updateTransaction = async (req, res) => {
   }
 };
 
-// Get only transactions that need user review
+// 5. PENDING (Preserved)
 exports.getPendingClarifications = async (req, res) => {
   try {
     const transactions = await Transaction.findPending(req.user);
@@ -160,17 +164,7 @@ exports.getPendingClarifications = async (req, res) => {
   }
 };
 
-// Get transactions that need user review
-exports.getPendingClarifications = async (req, res) => {
-  try {
-    const transactions = await Transaction.findPending(req.user);
-    res.status(200).json(transactions);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch pending tasks" });
-  }
-};
-
-// Get spending breakdown by category (for Flutter charts)
+// 6. CATEGORY BREAKDOWN (Preserved)
 exports.getCategoryBreakdown = async (req, res) => {
   try {
     const totals = await Transaction.getCategoryTotals(req.user);
@@ -180,10 +174,10 @@ exports.getCategoryBreakdown = async (req, res) => {
   }
 };
 
-// Search transactions
+// 7. SEARCH (Preserved)
 exports.searchTransactions = async (req, res) => {
   try {
-    const { q } = req.query; // Get search term from URL
+    const { q } = req.query;
     if (!q) {
       return res.status(400).json({ error: "Search term is required" });
     }
@@ -196,6 +190,7 @@ exports.searchTransactions = async (req, res) => {
   }
 };
 
+// 8. DATE FILTER (Preserved)
 exports.getTransactionsByDate = async (req, res) => {
   try {
     const { start, end } = req.query;

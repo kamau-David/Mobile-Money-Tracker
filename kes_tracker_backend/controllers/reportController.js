@@ -1,10 +1,11 @@
 const Transaction = require("../models/TransactionModel");
 const User = require("../models/UserModel");
 const PDFDocument = require("pdfkit");
+const nodemailer = require("nodemailer");
 
 exports.generatePDF = async (req, res) => {
   try {
-    const userId = req.user;
+    const userId = req.user; // From your 'protect' middleware
     const { category, start, end, txId } = req.query;
 
     const trendStart =
@@ -14,7 +15,7 @@ exports.generatePDF = async (req, res) => {
         .split("T")[0];
     const trendEnd = end || new Date().toISOString().split("T")[0];
 
-    // 1. Fetch Data
+    // 1. Fetch Data using your User and Transaction models
     const user = await User.findById(userId);
     const transactions = await Transaction.findForReport(userId, {
       category,
@@ -32,16 +33,12 @@ exports.generatePDF = async (req, res) => {
     if (!transactions || transactions.length === 0)
       return res.status(404).json({ error: "No transactions found" });
 
-    // 2. Initialize PDF Document (Using Standard Fonts)
+    // 2. Initialize PDF Document
     const doc = new PDFDocument({ margin: 50, bufferPages: true });
 
-    // 3. Setup Response Stream
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=KES_Tracker_Report.pdf`,
-    );
-    doc.pipe(res);
+    // --- Buffer Logic: Collect chunks for Nodemailer ---
+    let buffers = [];
+    doc.on("data", buffers.push.bind(buffers));
 
     // --- HEADER & BRANDING ---
     doc
@@ -56,7 +53,7 @@ exports.generatePDF = async (req, res) => {
       .text("Professional Financial Statement", { align: "right" });
     doc.moveDown();
 
-    // --- USER DETAILS ---
+    // --- USER DETAILS (Matched to your UserModel) ---
     doc
       .fontSize(12)
       .fillColor("#000")
@@ -202,13 +199,7 @@ exports.generatePDF = async (req, res) => {
       currentY += rowHeight;
     });
 
-    doc
-      .rect(50, tableTop, 500, currentY - tableTop)
-      .strokeColor("#2E7D32")
-      .lineWidth(1)
-      .stroke();
-
-    // --- FOOTER ---
+    // --- FOOTER & PAGE NUMBERING ---
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
@@ -224,24 +215,73 @@ exports.generatePDF = async (req, res) => {
         );
     }
 
+    // --- FINALIZATION: Handle Email and Download ---
     doc.end();
+
+    doc.on("end", async () => {
+      const pdfBuffer = Buffer.concat(buffers);
+
+      // --- NODEMAILER LOGIC ---
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: `"KES Tracker" <${process.env.EMAIL_USER}>`,
+        to: user.email_address, // Using your specific UserModel column name
+        subject: `Your KES Tracker Statement - ${new Date().toLocaleDateString()}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #2E7D32;">KES Tracker Statement</h2>
+            <p>Hello ${user.full_name},</p>
+            <p>Your financial report for <b>${start || "Beginning"} to ${end || "Present"}</b> is ready.</p>
+            <p>Please find the attached PDF for your transaction records.</p>
+            <br/>
+            <p>Best Regards,<br/><b>KES Tracker Team</b></p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: `KES_Report_${new Date().toISOString().split("T")[0]}.pdf`,
+            content: pdfBuffer,
+          },
+        ],
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Report sent to ${user.email_address}`);
+      } catch (emailErr) {
+        console.error("Email dispatch failed:", emailErr);
+      }
+
+      // --- BROWSER RESPONSE ---
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=KES_Tracker_Report.pdf",
+      );
+      res.send(pdfBuffer);
+    });
   } catch (error) {
-    console.error("PDF Error:", error);
+    console.error("Critical Error in Report Generation:", error);
     if (!res.headersSent) {
-      res.status(500).json({ error: "Generation failed" });
+      res.status(500).json({ error: "Could not generate or email report" });
     }
   }
 };
 
 exports.getDashboardStats = async (req, res) => {
   try {
-    const userId = req.user; // Provided by your 'protect' middleware
+    const userId = req.user;
+    const categoryStats = await Transaction.getCategoryTotals(userId); // Matches your Transaction model method
 
-    const categoryStats = await Transaction.getCategoryStats(userId);
-
-    // Calculate total spending
     const totalSpent = categoryStats.reduce(
-      (sum, item) => sum + parseFloat(item.total_amount),
+      (sum, item) => sum + parseFloat(item.total),
       0,
     );
 
@@ -251,11 +291,11 @@ exports.getDashboardStats = async (req, res) => {
       breakdown: categoryStats,
       message:
         categoryStats.length > 0
-          ? `You spent the most on ${categoryStats[0].category} this month.`
-          : "No expenses found for this period.",
+          ? `Highest spending category: ${categoryStats[0].category}`
+          : "No expense data for this period.",
     });
   } catch (error) {
-    console.error("Stats Error:", error);
-    res.status(500).json({ error: "Could not calculate spending stats" });
+    console.error("Stats Calculation Error:", error);
+    res.status(500).json({ error: "Failed to retrieve analytics" });
   }
 };

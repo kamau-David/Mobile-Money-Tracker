@@ -1,11 +1,11 @@
 const { pool } = require("../config/db");
 
 const Transaction = {
-  // 1. Create: Linked to the logged-in user
+  // 1. Create: Updated to include post_balance
   create: async (data) => {
     const query = `
-      INSERT INTO transactions (user_id, transaction_id, amount, merchant, category, type, sms_raw, needs_clarification)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO transactions (user_id, transaction_id, amount, merchant, category, type, sms_raw, post_balance, needs_clarification)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       ON CONFLICT (transaction_id) DO NOTHING
       RETURNING *;
     `;
@@ -17,13 +17,14 @@ const Transaction = {
       data.category,
       data.type,
       data.smsRaw,
+      data.postBalance, // Passed from your updated smsController
       data.needsClarification,
     ];
     const { rows } = await pool.query(query, values);
     return rows[0];
   },
 
-  // 2. FindAll
+  // 2. FindAll (Ordered by newest first)
   findAll: async (userId) => {
     const query =
       "SELECT * FROM transactions WHERE user_id = $1 ORDER BY created_at DESC;";
@@ -31,23 +32,28 @@ const Transaction = {
     return rows;
   },
 
-  // 3. GetSummary
+  // 3. GetSummary (Optimized to show actual M-Pesa balance)
   getSummary: async (userId) => {
+    // This query gets the totals AND the very latest post_balance recorded
     const query = `
       SELECT 
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as total_income,
-        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as total_expense
+        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as total_expense,
+        (SELECT post_balance FROM transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) as latest_mpesa_balance
       FROM transactions
       WHERE user_id = $1;
     `;
     const { rows } = await pool.query(query, [userId]);
     const totals = rows[0];
-    const totalIncome = parseFloat(totals.total_income || 0);
-    const totalExpense = parseFloat(totals.total_expense || 0);
+
     return {
-      totalIncome,
-      totalExpense,
-      currentBalance: totalIncome - totalExpense,
+      totalIncome: parseFloat(totals.total_income || 0),
+      totalExpense: parseFloat(totals.total_expense || 0),
+      // If we have a post_balance, use it. Otherwise, fallback to calculated balance.
+      currentBalance: totals.latest_mpesa_balance
+        ? parseFloat(totals.latest_mpesa_balance)
+        : parseFloat(totals.total_income || 0) -
+          parseFloat(totals.total_expense || 0),
     };
   },
 
@@ -79,7 +85,8 @@ const Transaction = {
       SELECT category, SUM(amount) as total 
       FROM transactions 
       WHERE user_id = $1 AND type = 'expense'
-      GROUP BY category;
+      GROUP BY category
+      ORDER BY total DESC;
     `;
     const { rows } = await pool.query(query, [userId]);
     return rows;
@@ -111,7 +118,7 @@ const Transaction = {
     return rows;
   },
 
-  // 9. Universal Filter (Updated for PDF Reports)
+  // 9. findForReport (Used by PDF engine)
   findForReport: async (userId, filters) => {
     let query = "SELECT * FROM transactions WHERE user_id = $1";
     const values = [userId];
@@ -127,16 +134,16 @@ const Transaction = {
       paramIndex += 2;
     }
     if (filters.transactionId) {
-      query += ` AND id = $${paramIndex++}`; // Using internal ID for precise single reports
+      query += ` AND id = $${paramIndex++}`;
       values.push(filters.transactionId);
     }
 
-    query += " ORDER BY created_at ASC;"; // ASC is better for drawing charts (left to right)
+    query += " ORDER BY created_at ASC;";
     const { rows } = await pool.query(query, values);
     return rows;
   },
 
-  // 10. NEW: Get Daily Trends (Directly for the PDF Line Chart)
+  // 10. getDailyTrends (For PDF charts)
   getDailyTrends: async (userId, startDate, endDate) => {
     const query = `
       SELECT 
@@ -153,14 +160,14 @@ const Transaction = {
     return rows;
   },
 
-  // 11. Get Detailed Category Stats (with Percentages)
+  // 11. getAdvancedCategoryStats
   getAdvancedCategoryStats: async (userId) => {
     const query = `
       SELECT 
         category, 
         SUM(amount) as total_amount,
         COUNT(*) as count,
-        ROUND((SUM(amount) / SUM(SUM(amount)) OVER ()) * 100, 1) as percentage
+        ROUND((SUM(amount) / NULLIF(SUM(SUM(amount)) OVER (), 0)) * 100, 1) as percentage
       FROM transactions 
       WHERE user_id = $1 AND type = 'expense'
       GROUP BY category
