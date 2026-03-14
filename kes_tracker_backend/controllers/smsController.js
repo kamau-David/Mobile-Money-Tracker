@@ -149,3 +149,13 @@ exports.updateTransaction = async (req, res) => {
     res.status(500).json({ error: "Failed to update transaction" });
   }
 };
+
+// Get only transactions that need user review
+exports.getPendingClarifications = async (req, res) => {
+  try {
+    const transactions = await Transaction.findPending(req.user);
+    res.status(200).json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch pending tasks" });
+  }
+};

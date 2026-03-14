@@ -54,11 +54,10 @@ const Transaction = {
     };
   },
 
-  // 4. NEW: Update method for user clarifications
+  // 4. Update method for user clarifications
   update: async (id, userId, updates) => {
     const { category, needsClarification } = updates;
 
-    // We filter by BOTH id and user_id so one user can't edit another's data
     const query = `
       UPDATE transactions 
       SET category = $1, needs_clarification = $2 
@@ -69,6 +68,29 @@ const Transaction = {
     const values = [category, needsClarification, id, userId];
     const { rows } = await pool.query(query, values);
     return rows[0];
+  },
+
+  // 5. FindPending: Get transactions needing review
+  findPending: async (userId) => {
+    const query = `
+      SELECT * FROM transactions 
+      WHERE user_id = $1 AND needs_clarification = true 
+      ORDER BY created_at DESC;
+    `;
+    const { rows } = await pool.query(query, [userId]);
+    return rows;
+  },
+
+  // 6. GetCategoryTotals: For chart data
+  getCategoryTotals: async (userId) => {
+    const query = `
+      SELECT category, SUM(amount) as total 
+      FROM transactions 
+      WHERE user_id = $1 AND type = 'expense'
+      GROUP BY category;
+    `;
+    const { rows } = await pool.query(query, [userId]);
+    return rows;
   },
 };
 
