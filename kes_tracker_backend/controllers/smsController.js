@@ -159,3 +159,23 @@ exports.getPendingClarifications = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch pending tasks" });
   }
 };
+
+// Get transactions that need user review
+exports.getPendingClarifications = async (req, res) => {
+  try {
+    const transactions = await Transaction.findPending(req.user);
+    res.status(200).json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch pending tasks" });
+  }
+};
+
+// Get spending breakdown by category (for Flutter charts)
+exports.getCategoryBreakdown = async (req, res) => {
+  try {
+    const totals = await Transaction.getCategoryTotals(req.user);
+    res.status(200).json(totals);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to calculate breakdown" });
+  }
+};
