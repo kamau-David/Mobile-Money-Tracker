@@ -5,10 +5,17 @@ const User = {
     const { fullName, email, phone, hashedPassword } = userData;
     const query = `
       INSERT INTO users (full_name, email_address,phone_number, password_hash)
-      VALUES ($1, $2) RETURNING id, full_name, email_address, phone_number;
+      VALUES ($1, $2,$3, $4) 
+      RETURNING id, full_name, email_address, phone_number;
     `;
     const values = [fullName, email, phone, hashedPassword];
     const { rows } = await pool.query(query, values);
+    return rows[0];
+  },
+
+  findByPhone: async (phone) => {
+    const query = "SELECT * FROM users WHERE phone_number = $1";
+    const { rows } = await pool.query(query, [phone]);
     return rows[0];
   },
 
