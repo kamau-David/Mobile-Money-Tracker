@@ -232,3 +232,30 @@ exports.generatePDF = async (req, res) => {
     }
   }
 };
+
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const userId = req.user; // Provided by your 'protect' middleware
+
+    const categoryStats = await Transaction.getCategoryStats(userId);
+
+    // Calculate total spending
+    const totalSpent = categoryStats.reduce(
+      (sum, item) => sum + parseFloat(item.total_amount),
+      0,
+    );
+
+    res.json({
+      success: true,
+      totalSpent,
+      breakdown: categoryStats,
+      message:
+        categoryStats.length > 0
+          ? `You spent the most on ${categoryStats[0].category} this month.`
+          : "No expenses found for this period.",
+    });
+  } catch (error) {
+    console.error("Stats Error:", error);
+    res.status(500).json({ error: "Could not calculate spending stats" });
+  }
+};

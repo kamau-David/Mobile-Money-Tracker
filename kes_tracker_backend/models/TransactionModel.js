@@ -152,6 +152,23 @@ const Transaction = {
     const { rows } = await pool.query(query, values);
     return rows;
   },
+
+  // 11. Get Detailed Category Stats (with Percentages)
+  getAdvancedCategoryStats: async (userId) => {
+    const query = `
+      SELECT 
+        category, 
+        SUM(amount) as total_amount,
+        COUNT(*) as count,
+        ROUND((SUM(amount) / SUM(SUM(amount)) OVER ()) * 100, 1) as percentage
+      FROM transactions 
+      WHERE user_id = $1 AND type = 'expense'
+      GROUP BY category
+      ORDER BY total_amount DESC;
+    `;
+    const { rows } = await pool.query(query, [userId]);
+    return rows;
+  },
 };
 
 module.exports = Transaction;
