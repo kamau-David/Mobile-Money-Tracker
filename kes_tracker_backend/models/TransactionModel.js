@@ -123,6 +123,31 @@ const Transaction = {
     const { rows } = await pool.query(query, values);
     return rows;
   },
+
+  // 9. Universal Filter: For reports
+  findForReport: async (userId, filters) => {
+    let query = "SELECT * FROM transactions WHERE user_id = $1";
+    const values = [userId];
+    let paramIndex = 2;
+
+    if (filters.category) {
+      query += ` AND category = $${paramIndex++}`;
+      values.push(filters.category);
+    }
+    if (filters.startDate && filters.endDate) {
+      query += ` AND created_at BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      values.push(filters.startDate, filters.endDate);
+      paramIndex += 2;
+    }
+    if (filters.transactionId) {
+      query += ` AND transaction_id = $${paramIndex++}`;
+      values.push(filters.transactionId);
+    }
+
+    query += " ORDER BY created_at DESC;";
+    const { rows } = await pool.query(query, values);
+    return rows;
+  },
 };
 
 module.exports = Transaction;

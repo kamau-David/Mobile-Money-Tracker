@@ -5,19 +5,29 @@ const PDFDocument = require("pdfkit");
 exports.generatePDF = async (req, res) => {
   try {
     const userId = req.user;
+    // Extract filters from query parameters
+    const { category, start, end, txId } = req.query;
 
-    // 1. Fetch data from PostgreSQL
+    // 1. Fetch Filtered Data
     const user = await User.findById(userId);
-    const transactions = await Transaction.findAll(userId);
-    const summary = await Transaction.getSummary(userId);
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    // Use the Universal Filter we built in the Model
+    const transactions = await Transaction.findForReport(userId, {
+      category,
+      startDate: start,
+      endDate: end,
+      transactionId: txId,
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!transactions || transactions.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No transactions found for this selection" });
     }
 
     // 2. Initialize PDF
-    const doc = new PDFDocument({ margin: 50 });
-
+    const doc = new PDFDocument({ margin: 50, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
@@ -37,118 +47,105 @@ exports.generatePDF = async (req, res) => {
     doc.moveDown();
 
     // 4. USER DETAILS
-    doc.fontSize(12).text(`Account Holder: ${user.full_name}`);
-    doc.text(`Phone Number: ${user.phone_number}`);
-    doc.text(`Report Date: ${new Date().toLocaleDateString("en-GB")}`);
-    doc.moveDown();
-    doc.rect(50, doc.y, 500, 1).fill("#EEEEEE");
-    doc.moveDown();
-
-    // 5. SUMMARY BOX (ENHANCED)
-    const boxTop = doc.y;
-    doc.rect(50, boxTop, 500, 90).fillAndStroke("#f9f9f9", "#2E7D32"); // Green border box
-
-    doc
-      .fillColor("#2E7D32")
-      .fontSize(14)
-      .text("Account Overview", 70, boxTop + 10);
-
-    doc.fillColor("#000").fontSize(10);
-    doc.text(
-      `Total Income:   KES ${summary.totalIncome.toLocaleString()}`,
-      70,
-      boxTop + 35,
-    );
-    doc.text(
-      `Total Expense:  KES ${summary.totalExpense.toLocaleString()}`,
-      70,
-      boxTop + 50,
-    );
-
-    const balanceColor = summary.currentBalance >= 0 ? "#1B5E20" : "#C62828";
     doc
       .fontSize(12)
+      .font("Helvetica-Bold")
+      .text(`Account Holder: ${user.full_name}`);
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .text(`Phone Number: ${user.phone_number}`);
+    doc.text(`Report Period: ${start || "Beginning"} - ${end || "Present"}`);
+    doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`);
+    doc.moveDown();
+
+    // 5. SUMMARY BOX
+    // Calculate summary based ONLY on filtered transactions
+    const totalIncome = transactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const totalExpense = transactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const balance = totalIncome - totalExpense;
+
+    const boxTop = doc.y;
+    doc.rect(50, boxTop, 500, 70).fillAndStroke("#f9f9f9", "#2E7D32");
+    doc
+      .fillColor("#2E7D32")
+      .fontSize(12)
+      .text("Report Summary", 70, boxTop + 10);
+    doc.fillColor("#000").fontSize(10);
+    doc.text(`Income: KES ${totalIncome.toLocaleString()}`, 70, boxTop + 30);
+    doc.text(`Expense: KES ${totalExpense.toLocaleString()}`, 200, boxTop + 30);
+
+    const balanceColor = balance >= 0 ? "#1B5E20" : "#C62828";
+    doc
       .fillColor(balanceColor)
       .font("Helvetica-Bold")
-      .text(
-        `Net Balance:    KES ${summary.currentBalance.toLocaleString()}`,
-        70,
-        boxTop + 70,
-      );
-
+      .text(`Net Cash Flow: KES ${balance.toLocaleString()}`, 70, boxTop + 50);
     doc.font("Helvetica").fillColor("#000").moveDown(4);
 
-    // --- CATEGORY BREAKDOWN LOGIC ---
-    // We calculate this on the fly from the transactions fetched
-    const categories = {};
-    transactions
-      .filter((t) => t.type === "expense")
-      .forEach((t) => {
-        // Attempt to guess category from merchant name or keep it as 'Other'
-        const cat = t.merchant.toLowerCase().includes("kplc")
-          ? "Utilities"
-          : t.merchant.toLowerCase().includes("smith")
-            ? "Personal"
-            : "General";
-        categories[cat] = (categories[cat] || 0) + parseFloat(t.amount);
-      });
-
-    if (Object.keys(categories).length > 0) {
-      doc.fontSize(12).text("Expense Breakdown", { underline: true });
-      doc.moveDown(0.5);
-      doc.fontSize(9);
-      Object.entries(categories).forEach(([name, amt]) => {
-        doc.text(`${name}: KES ${amt.toLocaleString()}`);
-      });
-      doc.moveDown();
-    }
-    // --- END BREAKDOWN ---
-
-    doc.rect(50, doc.y, 500, 1).fill("#EEEEEE");
-    doc.moveDown();
-
-    // 6. TRANSACTION TABLE
-    doc
-      .fillColor("#000")
-      .fontSize(14)
-      .text("Transaction History", { underline: true });
-    doc.moveDown();
-
-    const tableTop = doc.y;
-    doc.fontSize(10).text("Date", 50, tableTop);
-    doc.text("Description/Merchant", 150, tableTop);
-    doc.text("Type", 350, tableTop);
-    doc.text("Amount (KES)", 450, tableTop);
-    doc.moveDown();
-    doc.rect(50, doc.y, 450, 0.5).fill("#CCCCCC");
+    // 6. TRANSACTION TABLE HEADER
+    doc.fontSize(12).text("Transaction History", { underline: true });
     doc.moveDown(0.5);
 
+    const tableTop = doc.y;
+    doc.fontSize(10).font("Helvetica-Bold");
+    doc.text("Date", 50, tableTop);
+    doc.text("Merchant/Description", 130, tableTop);
+    doc.text("Category", 320, tableTop);
+    doc.text("Amount (KES)", 450, tableTop);
+
+    doc
+      .moveTo(50, tableTop + 15)
+      .lineTo(550, tableTop + 15)
+      .strokeColor("#CCCCCC")
+      .stroke();
+    doc.moveDown(1);
+
+    // 7. RENDER ROWS
+    let y = tableTop + 25;
+    doc.font("Helvetica").fontSize(9);
+
     transactions.forEach((tx) => {
+      // Automatic Page Break Logic
+      if (y > 700) {
+        doc.addPage();
+        y = 50; // Reset Y on new page
+      }
+
       const date = new Date(tx.created_at).toLocaleDateString("en-GB");
       const amountColor = tx.type === "income" ? "#2E7D32" : "#C62828";
+      const displayAmount =
+        tx.type === "income"
+          ? `+${parseFloat(tx.amount).toLocaleString()}`
+          : `-${parseFloat(tx.amount).toLocaleString()}`;
 
+      doc.fillColor("#000").text(date, 50, y);
+      doc.text(tx.merchant.substring(0, 25), 130, y);
+      doc.text(tx.category || "General", 320, y);
       doc
-        .fillColor("#000")
-        .fontSize(9)
-        .text(date, 50)
-        .text(tx.merchant.substring(0, 30), 150)
-        .text(tx.type.toUpperCase(), 350)
         .fillColor(amountColor)
-        .text(tx.amount.toLocaleString(), 450);
+        .text(displayAmount, 450, y, { width: 100, align: "left" });
 
-      doc.moveDown(0.8);
+      y += 20;
     });
 
-    // 7. FOOTER
-    doc
-      .fontSize(8)
-      .fillColor("gray")
-      .text(
-        "Generated by KES Tracker AI. This is a computer-generated document.",
-        50,
-        750,
-        { align: "center" },
-      );
+    // 8. FOOTER (Page Numbers)
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc
+        .fontSize(8)
+        .fillColor("gray")
+        .text(
+          `Page ${i + 1} of ${range.count} | Generated by KES Tracker`,
+          50,
+          750,
+          { align: "center" },
+        );
+    }
 
     doc.end();
   } catch (error) {
