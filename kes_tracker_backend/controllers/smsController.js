@@ -179,3 +179,20 @@ exports.getCategoryBreakdown = async (req, res) => {
     res.status(500).json({ error: "Failed to calculate breakdown" });
   }
 };
+
+
+// Search transactions
+exports.searchTransactions = async (req, res) => {
+  try {
+    const { q } = req.query; // Get search term from URL
+    if (!q) {
+      return res.status(400).json({ error: "Search term is required" });
+    }
+
+    const results = await Transaction.search(req.user, q);
+    res.status(200).json(results);
+  } catch (error) {
+    console.error("Search Error:", error);
+    res.status(500).json({ error: "Search failed" });
+  }
+};

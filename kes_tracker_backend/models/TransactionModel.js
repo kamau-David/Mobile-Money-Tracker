@@ -92,6 +92,23 @@ const Transaction = {
     const { rows } = await pool.query(query, [userId]);
     return rows;
   },
+
+  // 7. Search: Find transactions by keyword
+  search: async (userId, searchTerm) => {
+    const query = `
+      SELECT * FROM transactions 
+      WHERE user_id = $1 
+      AND (
+        merchant ILIKE $2 OR 
+        category ILIKE $2 OR 
+        transaction_id ILIKE $2
+      )
+      ORDER BY created_at DESC;
+    `;
+    const values = [userId, `%${searchTerm}%`, exclusivos];
+    const { rows } = await pool.query(query, values);
+    return rows;
+  },
 };
 
 module.exports = Transaction;
