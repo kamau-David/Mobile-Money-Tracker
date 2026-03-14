@@ -180,7 +180,6 @@ exports.getCategoryBreakdown = async (req, res) => {
   }
 };
 
-
 // Search transactions
 exports.searchTransactions = async (req, res) => {
   try {
@@ -194,5 +193,25 @@ exports.searchTransactions = async (req, res) => {
   } catch (error) {
     console.error("Search Error:", error);
     res.status(500).json({ error: "Search failed" });
+  }
+};
+
+exports.getTransactionsByDate = async (req, res) => {
+  try {
+    const { start, end } = req.query;
+
+    if (!start || !end) {
+      return res
+        .status(400)
+        .json({ error: "Please provide both start and end dates" });
+    }
+
+    const results = await Transaction.filterByDate(req.user, start, end);
+    res.status(200).json(results);
+  } catch (error) {
+    console.error("Date Filter Error:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch transactions for this period" });
   }
 };

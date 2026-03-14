@@ -9,7 +9,8 @@ const {
   updateTransaction,
   getPendingClarifications,
   getCategoryBreakdown,
-  searchTransactions
+  searchTransactions,
+  getTransactionsByDate,
 } = require("../controllers/smsController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -23,5 +24,6 @@ router.get("/download-report", protect, reportController.generatePDF);
 router.get("/pending", protect, getPendingClarifications);
 router.get("/charts/categories", protect, getCategoryBreakdown);
 router.get("/search", protect, searchTransactions);
+router.get("/filter", protect, getTransactionsByDate);
 
 module.exports = router;

@@ -105,7 +105,21 @@ const Transaction = {
       )
       ORDER BY created_at DESC;
     `;
-    const values = [userId, `%${searchTerm}%`, exclusivos];
+    const values = [userId, `%${searchTerm}%`];
+    const { rows } = await pool.query(query, values);
+    return rows;
+  },
+
+  // 8. Filter by Date: Get transactions for a specific period
+  filterByDate: async (userId, startDate, endDate) => {
+    const query = `
+      SELECT * FROM transactions 
+      WHERE user_id = $1 
+      AND created_at BETWEEN $2 AND $3
+      ORDER BY created_at DESC;
+    `;
+    // We expect dates in YYYY-MM-DD format
+    const values = [userId, startDate, endDate];
     const { rows } = await pool.query(query, values);
     return rows;
   },
