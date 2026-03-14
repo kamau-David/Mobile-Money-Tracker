@@ -1,5 +1,6 @@
 const Bill = require("../models/BillModel");
 const Transaction = require("../models/TransactionModel");
+const Goal = require("../models/GoalModel"); // NEW IMPORT
 const { pool } = require("../config/db");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -12,10 +13,16 @@ exports.getUpcomingReminders = async (req, res) => {
     const today = new Date();
     const currentDay = today.getDate();
 
+    // Fetch User's name for personalization
+    const userResult = await pool.query(
+      "SELECT full_name FROM users WHERE id = $1",
+      [userId],
+    );
+    const firstName = userResult.rows[0]?.full_name.split(" ")[0] || "David";
+
     const bills = await Bill.findByUser(userId);
     let reminders = [];
 
-    // Use the exact same initialization logic from your smsController
     const model = genAI.getGenerativeModel({
       model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     });
@@ -25,19 +32,18 @@ exports.getUpcomingReminders = async (req, res) => {
         bill.due_date_day > currentDay &&
         bill.due_date_day <= currentDay + 3
       ) {
-        const prompt = `David has a bill for ${bill.merchant_name} (KES ${bill.amount_expected}) due on the ${bill.due_date_day}th. 
+        const prompt = `${firstName} has a bill for ${bill.merchant_name} (KES ${bill.amount_expected}) due on the ${bill.due_date_day}th. 
         It's now the ${currentDay}th. Write a short, friendly Kenyan-style reminder. 
         Ask about his plans for this payment. Be supportive, use a touch of Sheng or local context.`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        const text = response.text();
 
         reminders.push({
           merchant: bill.merchant_name,
           amount: bill.amount_expected,
           dueDate: bill.due_date_day,
-          aiMessage: text,
+          aiMessage: response.text(),
         });
       }
     }
@@ -51,13 +57,32 @@ exports.getUpcomingReminders = async (req, res) => {
   }
 };
 
-// 2. FORECAST LOGIC
+// 2. FORECAST LOGIC (Now with Savings Goal Awareness)
 exports.getForecast = async (req, res) => {
   try {
     const userId = req.user;
+
+    // A. Fetch User's Name
+    const userResult = await pool.query(
+      "SELECT full_name FROM users WHERE id = $1",
+      [userId],
+    );
+    const firstName = userResult.rows[0]?.full_name.split(" ")[0] || "David";
+
+    // B. Get actual M-Pesa balance
     const summary = await Transaction.getSummary(userId);
     const currentBalance = summary.currentBalance;
 
+    // C. Get "Reserved" money from Goals
+    const goalSummary = await Goal.getSummary(userId);
+    const totalGoalTarget = parseFloat(goalSummary.total_target || 0);
+    const totalSavedSoFar = parseFloat(goalSummary.total_saved || 0);
+
+    // Math: How much is David actually allowed to spend?
+    const spendableBalance =
+      currentBalance - (totalGoalTarget - totalSavedSoFar);
+
+    // D. Burn Rate Calculation
     const burnRateQuery = `
       SELECT AVG(daily_total) as avg_burn
       FROM (
@@ -65,7 +90,7 @@ exports.getForecast = async (req, res) => {
         FROM transactions
         WHERE user_id = $1 AND type = 'expense' 
         AND created_at > NOW() - INTERVAL '7 days'
-        GROUP BY DATE(current_date)
+        GROUP BY DATE(created_at)
       ) as daily_expenses;
     `;
 
@@ -87,17 +112,23 @@ exports.getForecast = async (req, res) => {
       model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     });
 
-    const prompt = `David has KES ${currentBalance} left. He spends an average of KES ${avgBurn.toFixed(2)} per day. 
-    He will likely run out of money in ${daysLeft} days (around ${exhaustionDate.toDateString()}).
+    // E. Updated Smart AI Prompt
+    const prompt = `${firstName} has KES ${currentBalance} in M-Pesa. 
+    He needs to save KES ${totalGoalTarget} for his goals. 
+    This means his 'safe' spendable balance is actually KES ${spendableBalance.toFixed(2)}. 
+    He spends KES ${avgBurn.toFixed(2)} per day and will hit 0 in ${daysLeft} days.
     Give a brief, witty "big brother" financial advice snippet in a Kenyan context. 
-    If the date is very soon, be more urgent.`;
+    If the spendable balance is negative, be very urgent—he is spending his goal money!`;
 
     const aiResult = await model.generateContent(prompt);
     const response = await aiResult.response;
 
     res.status(200).json({
       success: true,
-      currentBalance,
+      userName: firstName,
+      actualBalance: currentBalance,
+      spendableBalance: spendableBalance.toFixed(2),
+      reservedForGoals: (totalGoalTarget - totalSavedSoFar).toFixed(2),
       avgDailySpend: avgBurn.toFixed(2),
       daysRemaining: daysLeft,
       predictedExhaustionDate: exhaustionDate.toDateString(),

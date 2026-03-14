@@ -6,6 +6,7 @@ const smsRoutes = require("./routes/smsRoutes");
 const authRoutes = require("./routes/authRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const insightRoutes = require("./routes/insightRoutes");
+const goalRoutes = require("./routes/goalRoutes");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api", smsRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/insights", insightRoutes);
+app.use("/api/goals", goalRoutes);
 
 app.get("/", (req, res) => {
   res.send("🚀 KES Tracker Backend is Running!");
