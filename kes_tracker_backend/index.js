@@ -2,24 +2,25 @@ require("dotenv").config();
 const express = require("express");
 const { connectDB } = require("./config/db");
 const cors = require("cors");
-const smsRoutes = require("./routes/smsRoutes"); // 1. Clean import
+const smsRoutes = require("./routes/smsRoutes");
+const authRoutes = require("./routes/authRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 
 const app = express();
 
-// Initialize Database
+// Initializing Database
 connectDB();
 
-// Middleware
+// Middlewares
 app.use(express.json());
 app.use(cors());
+app.use("/api/auth", authRoutes);
+app.use("/api", smsRoutes);
+app.use("/api/reports", reportRoutes);
 
-// Basic Health Check (Optional but helpful)
 app.get("/", (req, res) => {
   res.send("🚀 KES Tracker Backend is Running!");
 });
-
-// 2. Use the imported routes
-app.use("/api", smsRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
