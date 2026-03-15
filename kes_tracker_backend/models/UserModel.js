@@ -1,7 +1,6 @@
 const { pool } = require("../config/db");
 
 const User = {
-  // Updated to include membership_id and subscription fields
   create: async (userData) => {
     const {
       fullName,
@@ -24,7 +23,7 @@ const User = {
       RETURNING 
         id, 
         full_name, 
-        email_address, 
+        email_address as email, 
         phone_number, 
         membership_id, 
         subscription_status, 
@@ -44,20 +43,18 @@ const User = {
     return rows[0];
   },
 
-  // Already selects all columns (*), which now includes membership_id
   findByPhone: async (phone) => {
     const query = "SELECT * FROM users WHERE phone_number = $1";
     const { rows } = await pool.query(query, [phone]);
     return rows[0];
   },
 
-  // Updated to select membership_id and other crucial auth fields
   findById: async (id) => {
     const query = `
       SELECT 
         id, 
         full_name, 
-        email_address, 
+        email_address as email, 
         phone_number, 
         membership_id, 
         subscription_status, 
@@ -70,7 +67,6 @@ const User = {
     return rows[0];
   },
 
-  // Helper method to increment the PDF count for free tier tracking
   incrementPdfCount: async (id) => {
     const query = `
       UPDATE users 
@@ -80,6 +76,52 @@ const User = {
     `;
     const { rows } = await pool.query(query, [id]);
     return rows[0];
+  },
+
+  // --- NEW: PASSWORD RESET DATABASE LOGIC ---
+
+  // Stores the code and sets an expiration timestamp (15 minutes from now)
+  saveResetCode: async (phone, code) => {
+    const query = `
+      UPDATE users 
+      SET reset_code = $1, 
+          reset_code_expires = NOW() + INTERVAL '15 minutes'
+      WHERE phone_number = $2;
+    `;
+    await pool.query(query, [code, phone]);
+  },
+
+  // Checks if the code matches AND if it hasn't expired yet
+  verifyResetCode: async (phone, code) => {
+    const query = `
+      SELECT id FROM users 
+      WHERE phone_number = $1 
+      AND reset_code = $2 
+      AND reset_code_expires > NOW();
+    `;
+    const { rows } = await pool.query(query, [phone, code]);
+    return rows.length > 0;
+  },
+
+  // Updates the actual password hash
+  updatePassword: async (phone, hashedPassword) => {
+    const query = `
+      UPDATE users 
+      SET password_hash = $1 
+      WHERE phone_number = $2;
+    `;
+    await pool.query(query, [hashedPassword, phone]);
+  },
+
+  // Clears the code after a successful reset for security
+  clearResetCode: async (phone) => {
+    const query = `
+      UPDATE users 
+      SET reset_code = NULL, 
+          reset_code_expires = NULL 
+      WHERE phone_number = $1;
+    `;
+    await pool.query(query, [phone]);
   },
 };
 

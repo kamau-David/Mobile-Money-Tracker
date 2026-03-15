@@ -2,10 +2,10 @@ class UserModel {
   final String name;
   final String email;
   final String userId;
-  final String membershipId; // Added for your unique KES ID
+  final String membershipId;
   final String memberSince;
-  final String subscriptionStatus; // Added to track 'free' or 'pro'
-  final int reportCount; // Added to track the 1-report limit
+  final String subscriptionStatus;
+  final int reportCount;
 
   UserModel({
     required this.name,
@@ -17,35 +17,58 @@ class UserModel {
     required this.reportCount,
   });
 
-  // This factory constructor takes the JSON from your Node.js response
-  // and maps it to your Flutter variables.
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      userId: json['id'].toString(),
-      // We map 'full_name' from the backend to 'name' in Flutter
-      name: json['full_name'] ?? '',
+      // id can be int or string depending on DB; toString() handles both
+      userId: json['id']?.toString() ?? '',
+
+      // Matches your Node.js 'full_name' key
+      name: json['full_name'] ?? 'User',
+
       email: json['email'] ?? '',
-      membershipId: json['membership_id'] ?? 'N/A',
-      memberSince: json['created_at'] ?? DateTime.now().toString(),
+
+      membershipId: json['membership_id'] ?? 'KES-0000',
+
+      // Fallback to current date if backend doesn't provide created_at
+      memberSince: json['created_at'] ?? DateTime.now().toIso8601String(),
+
       subscriptionStatus: json['subscription_status'] ?? 'free',
-      reportCount: json['free_pdf_count'] ?? 0,
+
+      // Ensures the value is treated as an integer even if it arrives as a string
+      reportCount: json['free_pdf_count'] is int
+          ? json['free_pdf_count']
+          : int.tryParse(json['free_pdf_count']?.toString() ?? '0') ?? 0,
     );
   }
 
-  // Helpful for updating the UI after a subscription change
+  // Modified to allow updating more fields if needed
   UserModel copyWith({
     String? name,
+    String? email,
     String? subscriptionStatus,
     int? reportCount,
   }) {
     return UserModel(
       name: name ?? this.name,
-      email: this.email,
+      email: email ?? this.email,
       userId: this.userId,
       membershipId: this.membershipId,
       memberSince: this.memberSince,
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
       reportCount: reportCount ?? this.reportCount,
     );
+  }
+
+  // Added a toMap method—useful if you ever need to save user data locally in a DB
+  Map<String, dynamic> toJson() {
+    return {
+      'id': userId,
+      'full_name': name,
+      'email': email,
+      'membership_id': membershipId,
+      'created_at': memberSince,
+      'subscription_status': subscriptionStatus,
+      'free_pdf_count': reportCount,
+    };
   }
 }

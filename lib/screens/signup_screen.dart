@@ -1,8 +1,7 @@
-import 'dart:math'; // Required for password generation
+import 'dart:math'; // Added for password generation
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
-import '../providers/user_provider.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -20,7 +19,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _confirmPassController = TextEditingController();
 
   bool _isPasswordVisible = false;
-  bool _isLoading = false; // Added to handle backend request state
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -32,20 +31,24 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     super.dispose();
   }
 
-  // --- NEW: STRONG PASSWORD GENERATOR ---
+  // --- FEATURE: STRONG PASSWORD GENERATOR ---
   void _suggestStrongPassword() {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*';
+    const chars =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*';
     final random = Random.secure();
-    final password = List.generate(12, (index) => chars[random.nextInt(chars.length)]).join();
-    
+    final password = List.generate(
+      12,
+      (index) => chars[random.nextInt(chars.length)],
+    ).join();
+
     setState(() {
       _passController.text = password;
       _confirmPassController.text = password;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Strong password generated!")),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Strong password generated!")));
   }
 
   String? _validateEmail(String? value) {
@@ -55,29 +58,29 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return null;
   }
 
-  // --- UPDATED: CONNECTING TO BACKEND ---
   void _submitData() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      
       try {
-        // 1. Call your register method in the authProvider
-        // This should hit your Node.js POST /api/auth/register
-        await ref.read(authProvider.notifier).register(
-          _nameController.text.trim(),
-          _emailController.text.trim(),
-          _phoneController.text.trim(),
-          _passController.text,
-        );
+        // Sends data to Node.js including confirm_password for the Membership ID logic
+        await ref
+            .read(authProvider.notifier)
+            .register(
+              _nameController.text.trim(),
+              _emailController.text.trim(),
+              _phoneController.text.trim(),
+              _passController.text,
+              _confirmPassController.text,
+            );
 
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/main');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Registration failed: $e")),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(e.toString())));
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -150,40 +153,58 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     val!.length < 10 ? 'Enter a valid phone number' : null,
               ),
               const SizedBox(height: 20),
-              
-              // PASSWORD FIELD WITH "SUGGEST" LINK
+
+              // PASSWORD FIELD WITH SUGGEST FEATURE
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   TextFormField(
                     controller: _passController,
                     obscureText: !_isPasswordVisible,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                    decoration: _inputStyle("Password", Icons.lock, isDark).copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                          color: isDark ? Colors.white54 : Colors.grey,
-                        ),
-                        onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-                      ),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
                     ),
-                    validator: (val) => val!.length < 4 ? 'Password too short (min 4)' : null,
+                    decoration: _inputStyle("Password", Icons.lock, isDark)
+                        .copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: isDark ? Colors.white54 : Colors.grey,
+                            ),
+                            onPressed: () => setState(
+                              () => _isPasswordVisible = !_isPasswordVisible,
+                            ),
+                          ),
+                        ),
+                    validator: (val) =>
+                        val!.length < 4 ? 'Password too short (min 4)' : null,
                   ),
                   TextButton(
-                    onPressed: _suggestStrongPassword,
-                    child: const Text("Suggest strong password", style: TextStyle(color: primaryGreen, fontSize: 12)),
+                    onPressed:
+                        _suggestStrongPassword, // Restored the Suggest feature
+                    child: const Text(
+                      "Suggest strong password",
+                      style: TextStyle(color: primaryGreen, fontSize: 12),
+                    ),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 10),
               TextFormField(
                 controller: _confirmPassController,
                 obscureText: !_isPasswordVisible,
                 style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: _inputStyle("Confirm Password", Icons.lock_reset, isDark),
-                validator: (val) => val != _passController.text ? 'Passwords do not match' : null,
+                decoration: _inputStyle(
+                  "Confirm Password",
+                  Icons.lock_reset,
+                  isDark,
+                ),
+                validator: (val) => val != _passController.text
+                    ? 'Passwords do not match'
+                    : null,
               ),
               const SizedBox(height: 40),
               SizedBox(
@@ -193,12 +214,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _isLoading ? null : _submitData,
-                  child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("SIGN UP", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "SIGN UP",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -209,7 +238,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  InputDecoration _inputStyle(String label, IconData icon, bool isDark, [String? hint]) {
+  InputDecoration _inputStyle(
+    String label,
+    IconData icon,
+    bool isDark, [
+    String? hint,
+  ]) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
@@ -218,7 +252,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade400),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : Colors.grey.shade400,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
