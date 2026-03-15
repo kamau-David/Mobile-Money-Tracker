@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/finance_provider.dart';
+import '../providers/user_provider.dart'; // Assuming your user details are here
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -37,22 +38,64 @@ class SummaryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // These providers perform the grouping logic from your Postgres data
     final categoryData = ref.watch(categorySpendingProvider);
     final totalSpent = ref.watch(filteredTotalSpentProvider);
     final activeFilter = ref.watch(financeProvider).activeFilter;
+    final userData = ref.watch(userProvider); // Pulling user email
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2E7D32),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           "Spending Summary",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.mark_email_read_outlined),
+            tooltip: "Email PDF Report",
+            onPressed: () async {
+              if (userData.email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Please set an email in Profile first."),
+                  ),
+                );
+                return;
+              }
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Requesting PDF report via email..."),
+                ),
+              );
+
+              // Call the new trigger method
+              final success = await ref
+                  .read(financeProvider.notifier)
+                  .triggerPdfEmail(activeFilter.name, userData.email);
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? "Report sent to ${userData.email}!"
+                          : "Failed to send email. Check server connection.",
+                    ),
+                    backgroundColor: success
+                        ? const Color(0xFF2E7D32)
+                        : Colors.redAccent,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -179,10 +222,6 @@ class SummaryScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          if (!isDark)
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
         border: isDark ? Border.all(color: Colors.white10) : null,
       ),
       child: Row(

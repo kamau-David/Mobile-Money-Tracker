@@ -103,7 +103,7 @@ class FinanceNotifier extends Notifier<FinanceState> {
     }
   }
 
-  /// DELETE all transactions from Postgres
+  /// DELETE all transactions from Postgres (linked to Settings Screen)
   Future<void> clearAllTransactions() async {
     try {
       final response = await http.delete(Uri.parse(baseUrl));
@@ -120,13 +120,29 @@ class FinanceNotifier extends Notifier<FinanceState> {
     }
   }
 
+  /// EMAIL PDF: Triggers the backend to generate PDF and send via email
+  Future<bool> triggerPdfEmail(String filter, String userEmail) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/send-report'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'filter': filter, 'email': userEmail}),
+      );
+
+      // Returns true if server accepts the request (Status 200)
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error requesting email report: $e");
+      return false;
+    }
+  }
+
   void setFilter(TransactionFilter filter) {
     state = state.copyWith(activeFilter: filter);
   }
 }
 
 // 4. THE PROVIDERS
-
 final financeProvider = NotifierProvider<FinanceNotifier, FinanceState>(
   () => FinanceNotifier(),
 );
