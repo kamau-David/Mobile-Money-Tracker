@@ -39,7 +39,7 @@ class SettingsScreen extends ConsumerWidget {
               child: Icon(Icons.person, color: Colors.white),
             ),
             title: Text(
-              userData.name,
+              userData.name.isEmpty ? "User Account" : userData.name,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
@@ -57,7 +57,7 @@ class SettingsScreen extends ConsumerWidget {
             leading: Icon(Icons.payments_outlined, color: Color(0xFF2E7D32)),
             title: Text("Currency"),
             subtitle: Text("Kenyan Shilling (KES)"),
-            trailing: Icon(Icons.lock_outline, size: 18),
+            trailing: Icon(Icons.lock_outline, size: 18, color: Colors.grey),
           ),
           const Divider(),
           _sectionHeader("App Settings"),
@@ -86,7 +86,7 @@ class SettingsScreen extends ConsumerWidget {
               style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
             subtitle: const Text(
-              "This will delete all your transactions permanently",
+              "Delete all transactions from the database permanently",
             ),
             onTap: () => _showDeleteDialog(context, ref),
           ),
@@ -152,7 +152,7 @@ class SettingsScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Text("Clear All Data?"),
         content: const Text(
-          "Are you sure? This action cannot be undone and all your spending history will be lost from this device.",
+          "Are you sure? This will wipe your history from the database. This action cannot be undone.",
         ),
         actions: [
           TextButton(
@@ -161,12 +161,13 @@ class SettingsScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
+              // Call the new clear method we added to the notifier
               await ref.read(financeProvider.notifier).clearAllTransactions();
               if (context.mounted) {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("All data has been wiped."),
+                    content: Text("Cloud and local data has been wiped."),
                     backgroundColor: Colors.black87,
                     behavior: SnackBarBehavior.floating,
                   ),

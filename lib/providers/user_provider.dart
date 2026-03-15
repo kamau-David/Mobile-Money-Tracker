@@ -29,6 +29,7 @@ class UserNotifier extends StateNotifier<UserData> {
     _loadUserData();
   }
 
+  /// Loads stored user data from local storage on app start
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('user_name') ?? "User";
@@ -44,29 +45,45 @@ class UserNotifier extends StateNotifier<UserData> {
     );
   }
 
+  /// Updates profile and ensures ID/Date are generated ONLY if they don't exist
   Future<void> updateProfile(String name, String email) async {
     final prefs = await SharedPreferences.getInstance();
 
-    String? existingId = prefs.getString('user_id');
-    String? existingDate = prefs.getString('member_since');
+    // Preserve existing ID or generate a new one if it's the first time
+    String currentId = state.userId != "KES-000"
+        ? state.userId
+        : "KES-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
 
-    final String userId =
-        existingId ??
-        "KES-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
-    final String memberSince =
-        existingDate ?? DateFormat('MMMM yyyy').format(DateTime.now());
+    // Preserve existing date or set it to 'now' if it's the first time
+    String currentMemberSince = state.memberSince != "---"
+        ? state.memberSince
+        : DateFormat('MMMM yyyy').format(DateTime.now());
 
     state = UserData(
       name: name,
       email: email,
-      userId: userId,
-      memberSince: memberSince,
+      userId: currentId,
+      memberSince: currentMemberSince,
     );
 
+    // Persist to local storage
     await prefs.setString('user_name', name);
     await prefs.setString('user_email', email);
-    await prefs.setString('user_id', userId);
-    await prefs.setString('member_since', memberSince);
+    await prefs.setString('user_id', currentId);
+    await prefs.setString('member_since', currentMemberSince);
+  }
+
+  /// Resets user data (useful for Logout or wiping the device)
+  Future<void> clearUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // Wipes all SharedPreferences keys
+
+    state = UserData(
+      name: "User",
+      email: "",
+      userId: "KES-000",
+      memberSince: "---",
+    );
   }
 }
 

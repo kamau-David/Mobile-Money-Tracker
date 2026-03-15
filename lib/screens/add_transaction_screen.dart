@@ -12,7 +12,7 @@ class AddTransactionScreen extends ConsumerStatefulWidget {
 }
 
 class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
-  final _titleController = TextEditingController();
+  final _merchantController = TextEditingController();
   final _amountController = TextEditingController();
 
   String _selectedCategory = 'General';
@@ -35,30 +35,31 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
+    _merchantController.dispose();
     _amountController.dispose();
     super.dispose();
   }
 
   void _saveTransaction() async {
-    final String title = _titleController.text.trim();
+    final String merchant = _merchantController.text.trim();
     final String amountText = _amountController.text.trim();
 
-    if (amountText.isNotEmpty && title.isNotEmpty) {
+    if (amountText.isNotEmpty && merchant.isNotEmpty) {
       final double? amountValue = double.tryParse(amountText);
 
       if (amountValue != null) {
+        // Tunatumia logic ya database: merchant na type
         ref
             .read(financeProvider.notifier)
             .addTransaction(
-              title: title,
+              merchant: merchant,
               category: _selectedCategory,
               amount: amountValue,
-              isIncome: _isIncome,
+              type: _isIncome ? 'Income' : 'Expense',
             );
 
         setState(() {
-          _titleController.clear();
+          _merchantController.clear();
           _amountController.clear();
           _selectedCategory = 'General';
           _isIncome = false;
@@ -66,7 +67,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Success! $title has been recorded."),
+            content: Text("Success! $merchant has been recorded."),
             backgroundColor: const Color(0xFF2E7D32),
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
@@ -157,7 +158,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             TextField(
-              controller: _titleController,
+              controller: _merchantController,
               style: TextStyle(color: isDark ? Colors.white : Colors.black),
               decoration: InputDecoration(
                 hintText: "What was this for?",

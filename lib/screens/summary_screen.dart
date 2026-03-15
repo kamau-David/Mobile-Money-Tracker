@@ -37,6 +37,7 @@ class SummaryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // These providers perform the grouping logic from your Postgres data
     final categoryData = ref.watch(categorySpendingProvider);
     final totalSpent = ref.watch(filteredTotalSpentProvider);
     final activeFilter = ref.watch(financeProvider).activeFilter;
@@ -51,6 +52,7 @@ class SummaryScreen extends ConsumerWidget {
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -79,18 +81,18 @@ class SummaryScreen extends ConsumerWidget {
                   : PieChart(
                       PieChartData(
                         sections: _buildSections(categoryData, isDark),
-                        centerSpaceRadius: 40,
+                        centerSpaceRadius: 45,
                         sectionsSpace: 4,
                         pieTouchData: PieTouchData(enabled: true),
                       ),
                     ),
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 60),
             _dataCard(
               context,
               "Total Expenses",
               "KES ${totalSpent.toStringAsFixed(0)}",
-              Colors.red,
+              Colors.redAccent,
               isDark,
             ),
             const SizedBox(height: 15),
@@ -98,12 +100,12 @@ class SummaryScreen extends ConsumerWidget {
               context,
               "Categories",
               "${categoryData.length}",
-              Colors.blue,
+              Colors.blueAccent,
               isDark,
             ),
             const SizedBox(height: 30),
             Text(
-              "Note: Only negative transactions (expenses) are shown.",
+              "Note: Only expenses are shown in this chart.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
@@ -129,7 +131,7 @@ class SummaryScreen extends ConsumerWidget {
         color: color,
         radius: 55,
         badgeWidget: _buildExternalLabel(entry.key, entry.value, color, isDark),
-        badgePositionPercentageOffset: 1.5,
+        badgePositionPercentageOffset: 1.4,
       );
     }).toList();
   }
@@ -143,24 +145,16 @@ class SummaryScreen extends ConsumerWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 2, height: 12, color: color.withOpacity(0.6)),
+        Container(width: 2, height: 10, color: color.withOpacity(0.6)),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(6),
-            boxShadow: [
-              if (!isDark)
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-            ],
             border: Border.all(color: color.withOpacity(0.5), width: 1),
           ),
           child: Text(
-            "$label\n${value.toStringAsFixed(0)}%",
+            "$label\n${value.toStringAsFixed(1)}%",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 10,

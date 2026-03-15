@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction.dart';
 
+// 1. Define the filters available in the UI
 enum TransactionFilter { all, daily, weekly, monthly }
 
+// 2. Define the State Object
 class FinanceState {
   final double balance;
   final List<TransactionModel> transactions;
@@ -34,161 +35,143 @@ class FinanceState {
   }
 }
 
+// 3. The Notifier Logic
 class FinanceNotifier extends Notifier<FinanceState> {
-  static const _storageKey = 'money_tracker_data';
+  final String baseUrl = 'http://10.0.2.2:5000/api/transactions';
 
   @override
   FinanceState build() {
-    _loadData();
+    fetchTransactions();
     return FinanceState(balance: 0.0, transactions: [], isLoading: true);
   }
 
-  Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? saved = prefs.getString(_storageKey);
+  /// GET all transactions from Postgres
+  Future<void> fetchTransactions() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final response = await http.get(Uri.parse(baseUrl));
 
-    if (saved != null) {
-      try {
-        final List<dynamic> decoded = jsonDecode(saved);
-        final list = decoded
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final list = data
             .map((item) => TransactionModel.fromJson(item))
             .toList();
 
-        double currentBalance = 0.0;
-        for (var tx in list) {
-          final val =
-              double.tryParse(tx.amount.replaceAll(RegExp(r'[^0-9.]'), '')) ??
-              0.0;
-          tx.amount.contains('+')
-              ? currentBalance += val
-              : currentBalance -= val;
-        }
+        double currentBalance = list.fold(
+          0.0,
+          (sum, tx) => tx.type == 'Income' ? sum + tx.amount : sum - tx.amount,
+        );
 
         state = state.copyWith(
           balance: currentBalance,
           transactions: list,
           isLoading: false,
         );
-      } catch (e) {
+      } else {
         state = state.copyWith(isLoading: false);
       }
-    } else {
+    } catch (e) {
+      print("Database sync error: $e");
       state = state.copyWith(isLoading: false);
     }
   }
 
-  void addTransaction({
-    required String title,
+  /// POST a new transaction to Postgres
+  Future<void> addTransaction({
+    required String merchant,
     required String category,
     required double amount,
-    required bool isIncome,
-  }) {
-    final now = DateTime.now();
-    final newTx = TransactionModel(
-      title: title,
-      category: category,
-      amount: isIncome
-          ? "+ KES ${amount.toStringAsFixed(0)}"
-          : "- KES ${amount.toStringAsFixed(0)}",
-      color: isIncome ? Colors.green : Colors.red,
-      date: "${_getMonth(now.month)} ${now.day}",
-      timestamp: now,
-    );
+    required String type,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(baseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'merchant': merchant,
+          'category': category,
+          'amount': amount,
+          'type': type,
+        }),
+      );
 
-    final updatedTransactions = [newTx, ...state.transactions];
-    final updatedBalance = isIncome
-        ? state.balance + amount
-        : state.balance - amount;
-
-    state = state.copyWith(
-      balance: updatedBalance,
-      transactions: updatedTransactions,
-    );
-    _saveToDisk(updatedTransactions);
+      if (response.statusCode == 201) {
+        await fetchTransactions();
+      }
+    } catch (e) {
+      print("Error adding transaction: $e");
+    }
   }
 
-  // --- NEW: CLEAR ALL DATA METHOD ---
+  /// DELETE all transactions from Postgres
   Future<void> clearAllTransactions() async {
-    // 1. Reset the local state
-    state = state.copyWith(balance: 0.0, transactions: []);
+    try {
+      final response = await http.delete(Uri.parse(baseUrl));
 
-    // 2. Clear from disk (SharedPreferences)
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        state = state.copyWith(
+          balance: 0.0,
+          transactions: [],
+          isLoading: false,
+        );
+      }
+    } catch (e) {
+      print("Error wiping database: $e");
+    }
   }
 
-  Future<void> _saveToDisk(List<TransactionModel> list) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = jsonEncode(list.map((tx) => tx.toJson()).toList());
-    await prefs.setString(_storageKey, encoded);
-  }
-
-  void setFilter(TransactionFilter filter) =>
-      state = state.copyWith(activeFilter: filter);
-
-  String _getMonth(int m) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return months[m - 1];
+  void setFilter(TransactionFilter filter) {
+    state = state.copyWith(activeFilter: filter);
   }
 }
+
+// 4. THE PROVIDERS
 
 final financeProvider = NotifierProvider<FinanceNotifier, FinanceState>(
   () => FinanceNotifier(),
 );
 
-// --- PROVIDERS FOR FILTERING AND SUMMARY ---
-
 final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
   final finance = ref.watch(financeProvider);
   final now = DateTime.now();
+
   if (finance.activeFilter == TransactionFilter.all)
     return finance.transactions;
+
   return finance.transactions.where((tx) {
-    final diff = now.difference(tx.timestamp);
-    if (finance.activeFilter == TransactionFilter.daily)
-      return diff.inHours < 24;
-    if (finance.activeFilter == TransactionFilter.weekly)
-      return diff.inDays <= 7;
-    if (finance.activeFilter == TransactionFilter.monthly)
-      return diff.inDays <= 30;
-    return true;
+    final diff = now.difference(tx.createdAt);
+    switch (finance.activeFilter) {
+      case TransactionFilter.daily:
+        return diff.inHours < 24;
+      case TransactionFilter.weekly:
+        return diff.inDays <= 7;
+      case TransactionFilter.monthly:
+        return diff.inDays <= 30;
+      default:
+        return true;
+    }
   }).toList();
 });
 
 final filteredTotalSpentProvider = Provider<double>((ref) {
-  final transactions = ref.watch(filteredTransactionsProvider);
-  return transactions.fold(0.0, (sum, tx) {
-    if (!tx.amount.contains('-')) return sum;
-    final val =
-        double.tryParse(tx.amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-    return sum + val;
-  });
+  final filteredTxs = ref.watch(filteredTransactionsProvider);
+  return filteredTxs
+      .where((tx) => tx.type == 'Expense')
+      .fold(0.0, (sum, tx) => sum + tx.amount);
 });
 
 final categorySpendingProvider = Provider<Map<String, double>>((ref) {
-  final transactions = ref.watch(filteredTransactionsProvider);
-  final expenses = transactions.where((tx) => tx.amount.contains('-')).toList();
-  Map<String, double> categoryMap = {};
-  double total = 0.0;
-  for (var tx in expenses) {
-    final val =
-        double.tryParse(tx.amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-    categoryMap[tx.category] = (categoryMap[tx.category] ?? 0.0) + val;
-    total += val;
+  final filteredTxs = ref.watch(filteredTransactionsProvider);
+  final totalExpenses = ref.watch(filteredTotalSpentProvider);
+
+  if (totalExpenses == 0) return {};
+
+  Map<String, double> grouped = {};
+  for (var tx in filteredTxs.where((tx) => tx.type == 'Expense')) {
+    grouped[tx.category] = (grouped[tx.category] ?? 0.0) + tx.amount;
   }
-  if (total == 0) return {};
-  return categoryMap.map((key, value) => MapEntry(key, (value / total) * 100));
+
+  return grouped.map(
+    (category, amount) => MapEntry(category, (amount / totalExpenses) * 100),
+  );
 });

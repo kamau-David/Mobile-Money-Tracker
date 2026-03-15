@@ -9,6 +9,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watching the providers for real-time DB updates
     final finance = ref.watch(financeProvider);
     final userData = ref.watch(userProvider);
 
@@ -37,91 +38,113 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 150.0,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: const Color(0xFF2E7D32),
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 10),
-              title: Text(
-                "KES ${finance.balance.toStringAsFixed(0)}",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
-              ),
-              background: Container(
-                padding: const EdgeInsets.only(top: 15, left: 20),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(financeProvider.notifier).fetchTransactions(),
+        child: CustomScrollView(
+          slivers: [
+            // Sticky Balance Header
+            SliverAppBar(
+              expandedHeight: 150.0,
+              floating: false,
+              pinned: true,
+              elevation: 0,
+              backgroundColor: const Color(0xFF2E7D32),
+              flexibleSpace: FlexibleSpaceBar(
+                centerTitle: false,
+                titlePadding: const EdgeInsets.only(left: 20, bottom: 10),
+                title: Text(
+                  "KES ${finance.balance.toStringAsFixed(0)}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                background: Container(
+                  padding: const EdgeInsets.only(top: 15, left: 20),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Welcome, ${userData.name}",
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text(
+                        "Total Balance",
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Section Header
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "Welcome, ${userData.name}",
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
+                    const Text(
+                      "Recent Transactions",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Text(
-                      "Total Balance",
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    TextButton(
+                      onPressed: () {
+                        // Logic to navigate to a full transaction history screen
+                      },
+                      child: const Text(
+                        "See All",
+                        style: TextStyle(color: Color(0xFF2E7D32)),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Recent Transactions",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      "See All",
-                      style: TextStyle(color: Color(0xFF2E7D32)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          finance.transactions.isEmpty
-              ? SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _buildEmptyState(),
-                )
-              : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final tx = finance.transactions[index];
-                    return _TransactionCard(
-                      title: tx.title,
-                      category: tx.category,
-                      amount: tx.amount,
-                      color: tx.color,
-                    );
-                  }, childCount: finance.transactions.length),
+
+            // Main Content: Loading, Empty, or List
+            if (finance.isLoading)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
                 ),
-        ],
+              )
+            else if (finance.transactions.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildEmptyState(),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final tx = finance.transactions[index];
+                  return _TransactionCard(
+                    title: tx.merchant, // Mapped to DB merchant column
+                    category: tx.category,
+                    amount: tx.type == 'Income'
+                        ? "+ KES ${tx.amount.toStringAsFixed(0)}"
+                        : "- KES ${tx.amount.toStringAsFixed(0)}",
+                    color: tx.categoryColor, // Uses logic from TransactionModel
+                  );
+                }, childCount: finance.transactions.length),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -170,7 +193,7 @@ class _TransactionCard extends StatelessWidget {
         child: ListTile(
           leading: CircleAvatar(
             backgroundColor: color.withOpacity(0.1),
-            child: Icon(Icons.wallet, color: color, size: 20),
+            child: Icon(_getIconForCategory(category), color: color, size: 20),
           ),
           title: Text(
             title,
@@ -188,5 +211,21 @@ class _TransactionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Dynamic icon based on category
+  IconData _getIconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Icons.restaurant;
+      case 'transport':
+        return Icons.directions_bus;
+      case 'utilities':
+        return Icons.bolt;
+      case 'income':
+        return Icons.add_chart;
+      default:
+        return Icons.account_balance_wallet;
+    }
   }
 }

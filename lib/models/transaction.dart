@@ -1,59 +1,115 @@
 import 'package:flutter/material.dart';
 
 class TransactionModel {
-  final String title;
+  final int id;
+  final String transactionId; // Maps to transaction_id in DB
+  final String merchant; // Maps to merchant (replaces 'title')
   final String category;
-  final String amount;
-  final Color color;
-  final String date;
-  final DateTime timestamp;
+  final double amount; // Changed to double for finance math
+  final String type; // e.g., 'Income' or 'Expense'
+  final String? smsRaw; // Stores the original SMS
+  final Map<String, dynamic>? parsedMetadata; // Maps to jsonb
+  final DateTime createdAt;
+  final bool needsClarification;
+  final double? postBalance; // Tracks account health after transaction
+  final bool isRecurring;
 
   TransactionModel({
-    required this.title,
+    required this.id,
+    required this.transactionId,
+    required this.merchant,
     required this.category,
     required this.amount,
-    required this.color,
-    required this.date,
-    required this.timestamp,
+    required this.type,
+    this.smsRaw,
+    this.parsedMetadata,
+    required this.createdAt,
+    this.needsClarification = false,
+    this.postBalance,
+    this.isRecurring = false,
   });
 
+  // --- UI HELPER: CATEGORY COLORS ---
+  // Maintaining your color logic but keeping it out of the database
+  Color get categoryColor {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Colors.orange;
+      case 'transport':
+        return Colors.blue;
+      case 'utilities':
+        return Colors.purple;
+      case 'shopping':
+        return Colors.pink;
+      case 'income':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // --- HELPER: FORMATTED DATE ---
+  String get formattedDate =>
+      "${createdAt.day}/${createdAt.month}/${createdAt.year}";
+
   TransactionModel copyWith({
-    String? title,
+    int? id,
+    String? transactionId,
+    String? merchant,
     String? category,
-    String? amount,
-    Color? color,
-    String? date,
-    DateTime? timestamp,
+    double? amount,
+    String? type,
+    DateTime? createdAt,
+    bool? needsClarification,
+    double? postBalance,
   }) {
     return TransactionModel(
-      title: title ?? this.title,
+      id: id ?? this.id,
+      transactionId: transactionId ?? this.transactionId,
+      merchant: merchant ?? this.merchant,
       category: category ?? this.category,
       amount: amount ?? this.amount,
-      color: color ?? this.color,
-      date: date ?? this.date,
-      timestamp: timestamp ?? this.timestamp,
+      type: type ?? this.type,
+      createdAt: createdAt ?? this.createdAt,
+      needsClarification: needsClarification ?? this.needsClarification,
+      postBalance: postBalance ?? this.postBalance,
+    );
+  }
+
+  factory TransactionModel.fromJson(Map<String, dynamic> json) {
+    return TransactionModel(
+      id: json['id'],
+      transactionId: json['transaction_id'] ?? '',
+      merchant: json['merchant'] ?? 'Unknown',
+      category: json['category'] ?? 'General',
+      // Handles numeric/decimal coming from Postgres as String or Double
+      amount: double.parse(json['amount'].toString()),
+      type: json['type'] ?? 'Expense',
+      smsRaw: json['sms_raw'],
+      parsedMetadata: json['parsed_metadata'],
+      createdAt: DateTime.parse(json['created_at']),
+      needsClarification: json['needs_clarification'] ?? false,
+      postBalance: json['post_balance'] != null
+          ? double.parse(json['post_balance'].toString())
+          : null,
+      isRecurring: json['is_recurring'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'title': title,
+      'id': id,
+      'transaction_id': transactionId,
+      'merchant': merchant,
       'category': category,
       'amount': amount,
-      'colorValue': color.value,
-      'date': date,
-      'timestamp': timestamp.toIso8601String(),
+      'type': type,
+      'sms_raw': smsRaw,
+      'parsed_metadata': parsedMetadata,
+      'created_at': createdAt.toIso8601String(),
+      'needs_clarification': needsClarification,
+      'post_balance': postBalance,
+      'is_recurring': isRecurring,
     };
-  }
-
-  factory TransactionModel.fromJson(Map<String, dynamic> json) {
-    return TransactionModel(
-      title: json['title'],
-      category: json['category'],
-      amount: json['amount'],
-      color: Color(json['colorValue']),
-      date: json['date'],
-      timestamp: DateTime.parse(json['timestamp']),
-    );
   }
 }
