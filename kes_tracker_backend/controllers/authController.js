@@ -41,16 +41,27 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 6. SAVE: Create the user in the database
+    // --- NEW: GENERATE UNIQUE MEMBERSHIP ID ---
+    const membership_id = "KES-" + Math.floor(1000 + Math.random() * 9000);
+
+    // 6. SAVE: Create the user in the database (Now including Fintech fields)
     const newUser = await User.create({
       fullName: full_name,
       email: email,
       phone: phone_number,
       hashedPassword: hashedPassword,
+      membershipId: membership_id, // Pass to your User Model
+      subscriptionStatus: "free", // Default status for new users
+    });
+
+    // --- NEW: AUTO-LOGIN AFTER SIGNUP ---
+    const token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
     });
 
     res.status(201).json({
       message: "User registered successfully",
+      token, // Sending token so the user is logged in immediately
       user: newUser,
     });
   } catch (error) {
@@ -82,13 +93,19 @@ exports.login = async (req, res) => {
       expiresIn: "7d",
     });
 
+    // --- UPDATED: SEND ALL FIELDS TO FLUTTER USERMODEL ---
     res.status(200).json({
       message: "Login successful",
       token,
       user: {
         id: user.id,
         full_name: user.full_name,
+        email: user.email,
         phone_number: user.phone_number,
+        membership_id: user.membership_id, // Needed for Flutter Model
+        subscription_status: user.subscription_status, // Needed for PDF gatekeeping
+        free_pdf_count: user.free_pdf_count, // Track usage
+        created_at: user.created_at,
       },
     });
   } catch (error) {
