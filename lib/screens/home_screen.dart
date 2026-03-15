@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_money_tracker/screens/settings_screen.dart';
+import 'package:mobile_money_tracker/screens/add_transaction_screen.dart'; // Ensure this is imported
 import '../providers/finance_provider.dart';
 import '../providers/user_provider.dart';
+import '../models/transaction.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watching the providers for real-time DB updates
     final finance = ref.watch(financeProvider);
     final userData = ref.watch(userProvider);
+    final recentTransactions = ref.watch(recentTransactionsProvider);
+
+    // DYNAMIC: Filter transactions that Gemini isn't sure about
+    final pendingTransactions = recentTransactions
+        .where(
+          (tx) =>
+              tx.category.toLowerCase() == 'unsure' ||
+              tx.category.toLowerCase() == 'uncategorized',
+        )
+        .toList();
+
+    final int pendingCount = pendingTransactions.length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -39,8 +52,9 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(financeProvider.notifier).fetchTransactions(),
+        onRefresh: () => ref.read(financeProvider.notifier).refreshHomeData(),
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             // Sticky Balance Header
             SliverAppBar(
@@ -80,7 +94,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       const Text(
-                        "Total Balance",
+                        "M-Pesa Balance",
                         style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
@@ -89,42 +103,35 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
+            // Banner appears only if there are unsure transactions
+            if (pendingCount > 0)
+              SliverToBoxAdapter(
+                child: _buildActionRequiredBanner(
+                  context,
+                  pendingCount,
+                  pendingTransactions.first, // Pass the first one to verify
+                ),
+              ),
+
             // Section Header
-            SliverToBoxAdapter(
+            const SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Recent Transactions",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // Logic to navigate to a full transaction history screen
-                      },
-                      child: const Text(
-                        "See All",
-                        style: TextStyle(color: Color(0xFF2E7D32)),
-                      ),
-                    ),
-                  ],
+                padding: EdgeInsets.fromLTRB(20, 25, 20, 10),
+                child: Text(
+                  "Recent Activity",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
 
-            // Main Content: Loading, Empty, or List
+            // Main Content Logic
             if (finance.isLoading)
               const SliverFillRemaining(
                 child: Center(
                   child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
                 ),
               )
-            else if (finance.transactions.isEmpty)
+            else if (recentTransactions.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: _buildEmptyState(),
@@ -132,19 +139,101 @@ class HomeScreen extends ConsumerWidget {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
-                  final tx = finance.transactions[index];
+                  final tx = recentTransactions[index];
+                  final isIncome = tx.type.toLowerCase() == 'income';
+                  final bool isUnsure =
+                      tx.category.toLowerCase() == 'unsure' ||
+                      tx.category.toLowerCase() == 'uncategorized';
+
                   return _TransactionCard(
-                    title: tx.merchant, // Mapped to DB merchant column
+                    title: tx.merchant,
                     category: tx.category,
-                    amount: tx.type == 'Income'
+                    amount: isIncome
                         ? "+ KES ${tx.amount.toStringAsFixed(0)}"
                         : "- KES ${tx.amount.toStringAsFixed(0)}",
-                    color: tx.categoryColor, // Uses logic from TransactionModel
+                    color: isIncome ? Colors.green : Colors.redAccent,
+                    needsVerification: isUnsure,
+                    onTap: () {
+                      // Optional: Allow tapping individual cards to verify
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              AddTransactionScreen(initialData: tx),
+                        ),
+                      );
+                    },
                   );
-                }, childCount: finance.transactions.length),
+                }, childCount: recentTransactions.length),
               ),
+
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 80),
+            ), // Space for FAB if you have one
           ],
         ),
+      ),
+    );
+  }
+
+  // UPDATED: Now accepts the TransactionModel to pre-fill the next screen
+  Widget _buildActionRequiredBanner(
+    BuildContext context,
+    int count,
+    TransactionModel transaction,
+  ) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.psychology, color: Colors.orange, size: 30),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Help Gemini out!",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+                Text(
+                  "$count transactions need a category",
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // NAVIGATE: Send user to AddTransactionScreen with the unsure data
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AddTransactionScreen(initialData: transaction),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text("VERIFY"),
+          ),
+        ],
       ),
     );
   }
@@ -171,12 +260,16 @@ class _TransactionCard extends StatelessWidget {
   final String category;
   final String amount;
   final Color color;
+  final bool needsVerification;
+  final VoidCallback onTap;
 
   const _TransactionCard({
     required this.title,
     required this.category,
     required this.amount,
     required this.color,
+    required this.onTap,
+    this.needsVerification = false,
   });
 
   @override
@@ -186,44 +279,65 @@ class _TransactionCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 14),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(
+          color: needsVerification
+              ? Colors.orange.shade200
+              : Colors.grey.shade200,
+          width: needsVerification ? 1.5 : 1,
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: color.withOpacity(0.1),
-            child: Icon(_getIconForCategory(category), color: color, size: 20),
-          ),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(category, style: const TextStyle(fontSize: 12)),
-          trailing: Text(
-            amount,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+      child: ListTile(
+        onTap: onTap, // Added tap functionality
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.1),
+          child: Icon(_getIconForCategory(category), color: color, size: 20),
+        ),
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Row(
+          children: [
+            Text(category, style: const TextStyle(fontSize: 12)),
+            if (needsVerification) ...[
+              const SizedBox(width: 5),
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 14,
+                color: Colors.orange,
+              ),
+            ],
+          ],
+        ),
+        trailing: Text(
+          amount,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
           ),
         ),
       ),
     );
   }
 
-  // Dynamic icon based on category
   IconData _getIconForCategory(String category) {
     switch (category.toLowerCase()) {
       case 'food':
         return Icons.restaurant;
+      case 'shopping':
+        return Icons.shopping_bag;
       case 'transport':
         return Icons.directions_bus;
       case 'utilities':
         return Icons.bolt;
       case 'income':
         return Icons.add_chart;
+      case 'unsure':
+      case 'uncategorized':
+        return Icons.help_outline;
       default:
         return Icons.account_balance_wallet;
     }

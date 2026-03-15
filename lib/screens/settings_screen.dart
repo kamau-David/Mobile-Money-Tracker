@@ -100,7 +100,13 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             onTap: () async {
+              // 1. Log out from Auth (Clears token)
               await ref.read(authProvider.notifier).logout();
+
+              // 2. CRITICAL FIX: Wipe the finance state from memory
+              // This ensures the next user sees their own $0 balance
+              ref.invalidate(financeProvider);
+
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
                   context,
@@ -161,7 +167,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
-              // Call the new clear method we added to the notifier
               await ref.read(financeProvider.notifier).clearAllTransactions();
               if (context.mounted) {
                 Navigator.pop(ctx);

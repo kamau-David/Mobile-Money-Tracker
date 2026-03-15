@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../providers/finance_provider.dart';
 
 class HistoryScreen extends ConsumerWidget {
@@ -7,6 +8,7 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watching the filtered provider ensures the list updates when chips are clicked
     final transactions = ref.watch(filteredTransactionsProvider);
     final activeFilter = ref.watch(financeProvider).activeFilter;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -14,6 +16,7 @@ class HistoryScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2E7D32),
+        elevation: 0,
         title: const Text(
           "Transaction History",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -23,9 +26,17 @@ class HistoryScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          // Filter Section
           Container(
             padding: const EdgeInsets.symmetric(vertical: 16.0),
-            color: isDark ? Colors.black12 : Colors.grey[50],
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black26 : Colors.grey[50],
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.grey.shade300,
+                ),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -60,20 +71,16 @@ class HistoryScreen extends ConsumerWidget {
               ],
             ),
           ),
+
+          // Transactions List
           Expanded(
             child: transactions.isEmpty
-                ? Center(
-                    child: Text(
-                      "No transactions found for this period.",
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.grey,
-                      ),
-                    ),
-                  )
+                ? _buildEmptyState(isDark)
                 : ListView.builder(
+                    physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 8,
+                      vertical: 12,
                     ),
                     itemCount: transactions.length,
                     itemBuilder: (context, index) {
@@ -107,6 +114,7 @@ class HistoryScreen extends ConsumerWidget {
             ? Colors.white
             : (isDark ? Colors.white70 : Colors.black87),
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 12,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -116,42 +124,82 @@ class HistoryScreen extends ConsumerWidget {
               : (isDark ? Colors.white24 : Colors.grey.shade300),
         ),
       ),
-      elevation: isSelected ? 2 : 0,
-      pressElevation: 4,
+    );
+  }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.history_toggle_off,
+            size: 64,
+            color: isDark ? Colors.white24 : Colors.grey.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "No transactions found.",
+            style: TextStyle(
+              color: isDark ? Colors.white54 : Colors.grey,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _historyTile(tx, bool isDark) {
+    // Dynamic logic based on backend model fields
+    final bool isIncome = tx.type.toLowerCase() == 'income';
+    final Color txColor = isIncome ? Colors.green : Colors.red;
+
+    // Formatting the date from the DateTime object
+    final String formattedDate = DateFormat(
+      'MMM dd, yyyy • hh:mm a',
+    ).format(tx.createdAt);
+
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(15),
         side: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade200),
       ),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: tx.color.withOpacity(0.1),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: txColor.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
           child: Icon(
-            tx.amount.contains('+') ? Icons.arrow_upward : Icons.arrow_downward,
-            color: tx.color,
-            size: 18,
+            isIncome ? Icons.add_circle_outline : Icons.remove_circle_outline,
+            color: txColor,
+            size: 24,
           ),
         ),
         title: Text(
-          tx.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          tx.merchant,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          "${tx.category} • ${tx.date}",
-          style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+          "${tx.category} • $formattedDate",
+          style: TextStyle(
+            color: isDark ? Colors.white54 : Colors.black54,
+            fontSize: 12,
+          ),
         ),
         trailing: Text(
-          tx.amount,
+          "${isIncome ? '+' : '-'} KES ${tx.amount.toStringAsFixed(2)}",
           style: TextStyle(
-            color: tx.color,
+            color: txColor,
             fontWeight: FontWeight.bold,
-            fontSize: 16,
+            fontSize: 15,
           ),
         ),
       ),

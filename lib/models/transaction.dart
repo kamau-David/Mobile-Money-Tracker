@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 class TransactionModel {
   final int id;
   final String transactionId; // Maps to transaction_id in DB
-  final String merchant; // Maps to merchant (replaces 'title')
+  final String merchant;
   final String category;
-  final double amount; // Changed to double for finance math
-  final String type; // e.g., 'Income' or 'Expense'
-  final String? smsRaw; // Stores the original SMS
+  final double amount;
+  final String type; // 'income' or 'expense'
+  final String? smsRaw; // Maps to sms_raw in DB
   final Map<String, dynamic>? parsedMetadata; // Maps to jsonb
   final DateTime createdAt;
-  final bool needsClarification;
-  final double? postBalance; // Tracks account health after transaction
+  final bool needsClarification; // Maps to needs_clarification in DB
+  final double? postBalance; // Maps to post_balance in DB
   final bool isRecurring;
 
   TransactionModel({
@@ -30,7 +30,6 @@ class TransactionModel {
   });
 
   // --- UI HELPER: CATEGORY COLORS ---
-  // Maintaining your color logic but keeping it out of the database
   Color get categoryColor {
     switch (category.toLowerCase()) {
       case 'food':
@@ -62,6 +61,7 @@ class TransactionModel {
     DateTime? createdAt,
     bool? needsClarification,
     double? postBalance,
+    bool? isRecurring,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -73,24 +73,27 @@ class TransactionModel {
       createdAt: createdAt ?? this.createdAt,
       needsClarification: needsClarification ?? this.needsClarification,
       postBalance: postBalance ?? this.postBalance,
+      isRecurring: isRecurring ?? this.isRecurring,
     );
   }
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
-      id: json['id'],
+      id: json['id'] as int,
       transactionId: json['transaction_id'] ?? '',
       merchant: json['merchant'] ?? 'Unknown',
       category: json['category'] ?? 'General',
-      // Handles numeric/decimal coming from Postgres as String or Double
-      amount: double.parse(json['amount'].toString()),
-      type: json['type'] ?? 'Expense',
+      // Explicitly handling Postgres numeric/decimal types
+      amount: double.tryParse(json['amount'].toString()) ?? 0.0,
+      type: json['type'] ?? 'expense',
       smsRaw: json['sms_raw'],
       parsedMetadata: json['parsed_metadata'],
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
       needsClarification: json['needs_clarification'] ?? false,
       postBalance: json['post_balance'] != null
-          ? double.parse(json['post_balance'].toString())
+          ? double.tryParse(json['post_balance'].toString())
           : null,
       isRecurring: json['is_recurring'] ?? false,
     );

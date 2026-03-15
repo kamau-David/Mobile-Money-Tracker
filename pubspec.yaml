@@ -36,12 +36,15 @@ dependencies:
   http: ^1.1.0
   another_telephony: ^0.4.1
   permission_handler: ^11.0.0
+  telephony: ^0.2.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
   path_provider: ^2.1.5
+  flutter_local_notifications: ^20.1.0
+  dio: ^5.9.2
 
 dev_dependencies:
   flutter_test:

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/finance_provider.dart';
+import '../models/transaction.dart'; // Ensure this is imported
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
-  const AddTransactionScreen({super.key});
+  final TransactionModel? initialData; // Added for verification/pre-fill
+
+  const AddTransactionScreen({super.key, this.initialData});
 
   @override
   ConsumerState<AddTransactionScreen> createState() =>
@@ -34,6 +37,22 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Pre-fill data if we are coming from the "Verify" nudge
+    if (widget.initialData != null) {
+      _merchantController.text = widget.initialData!.merchant;
+      _amountController.text = widget.initialData!.amount.toString();
+      _isIncome = widget.initialData!.type.toLowerCase() == 'income';
+
+      // If the guessed category exists in our list, select it
+      if (_categories.any((c) => c['name'] == widget.initialData!.category)) {
+        _selectedCategory = widget.initialData!.category;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _merchantController.dispose();
     _amountController.dispose();
@@ -48,35 +67,36 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       final double? amountValue = double.tryParse(amountText);
 
       if (amountValue != null) {
-        // Tunatumia logic ya database: merchant na type
-        ref
-            .read(financeProvider.notifier)
-            .addTransaction(
-              merchant: merchant,
-              category: _selectedCategory,
-              amount: amountValue,
-              type: _isIncome ? 'Income' : 'Expense',
-            );
+        final notifier = ref.read(financeProvider.notifier);
 
-        setState(() {
-          _merchantController.clear();
-          _amountController.clear();
-          _selectedCategory = 'General';
-          _isIncome = false;
-        });
+        // If we have initialData, we UPDATE. If not, we ADD.
+        if (widget.initialData != null) {
+          await notifier.updateTransactionCategory(
+            widget.initialData!.id.toString(),
+            _selectedCategory,
+          );
+          // Note: If you want to update amount/merchant too,
+          // you'd need a full update API, but for now, we're verifying the category.
+        } else {
+          await notifier.addTransaction(
+            merchant: merchant,
+            category: _selectedCategory,
+            amount: amountValue,
+            type: _isIncome ? 'Income' : 'Expense',
+          );
+        }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Success! $merchant has been recorded."),
-            backgroundColor: const Color(0xFF2E7D32),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-
-        await Future.delayed(const Duration(milliseconds: 400));
-
-        if (mounted && Navigator.canPop(context)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.initialData != null ? "Verified!" : "Success! Recorded.",
+              ),
+              backgroundColor: const Color(0xFF2E7D32),
+              duration: const Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
           Navigator.pop(context);
         }
       }
@@ -96,9 +116,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Add Transaction",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        title: Text(
+          widget.initialData != null ? "Verify Transaction" : "Add Transaction",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: const Color(0xFF2E7D32),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -137,13 +160,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               ),
               decoration: InputDecoration(
                 hintText: "0.00",
-                hintStyle: TextStyle(
-                  color: isDark ? Colors.white38 : Colors.grey,
-                ),
                 prefixText: "KES ",
-                prefixStyle: TextStyle(
-                  color: isDark ? Colors.white70 : Colors.black87,
-                ),
                 enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.grey),
                 ),
@@ -162,9 +179,6 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               style: TextStyle(color: isDark ? Colors.white : Colors.black),
               decoration: InputDecoration(
                 hintText: "What was this for?",
-                hintStyle: TextStyle(
-                  color: isDark ? Colors.white38 : Colors.grey,
-                ),
                 enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.grey),
                 ),
@@ -201,12 +215,6 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                           ? const Color(0xFF2E7D32)
                           : (isDark ? Colors.white10 : Colors.grey[100]),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF2E7D32)
-                            : Colors.transparent,
-                        width: 1.5,
-                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -246,11 +254,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  elevation: 2,
                 ),
-                child: const Text(
-                  "SAVE TRANSACTION",
-                  style: TextStyle(
+                child: Text(
+                  widget.initialData != null
+                      ? "CONFIRM VERIFICATION"
+                      : "SAVE TRANSACTION",
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.1,
@@ -258,7 +267,6 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
           ],
         ),
       ),

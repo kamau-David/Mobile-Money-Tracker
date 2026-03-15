@@ -7,7 +7,8 @@ class ResetPasswordScreen extends ConsumerStatefulWidget {
   const ResetPasswordScreen({super.key, required this.phoneNumber});
 
   @override
-  ConsumerState<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
@@ -15,7 +16,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _codeController = TextEditingController();
   final _passController = TextEditingController();
   final _confirmPassController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
@@ -32,11 +33,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       setState(() => _isLoading = true);
       try {
         // Calling the method we added to the provider
-        await ref.read(authProvider.notifier).resetPassword(
-          widget.phoneNumber,
-          _codeController.text.trim(),
-          _passController.text,
-        );
+        await ref
+            .read(authProvider.notifier)
+            .resetPassword(
+              widget.phoneNumber,
+              _codeController.text.trim(),
+              _passController.text,
+            );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -48,7 +51,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.redAccent,
+            ),
           );
         }
       } finally {
@@ -74,11 +80,19 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           key: _formKey,
           child: Column(
             children: [
-              const Icon(Icons.security_outlined, size: 80, color: primaryGreen),
+              const Icon(
+                Icons.security_outlined,
+                size: 80,
+                color: primaryGreen,
+              ),
               const SizedBox(height: 20),
               const Text(
                 "New Password",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: primaryGreen),
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: primaryGreen,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
@@ -104,12 +118,19 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 controller: _passController,
                 obscureText: !_isPasswordVisible,
                 style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: _inputStyle("New Password", Icons.lock, isDark).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-                  ),
-                ),
+                decoration: _inputStyle("New Password", Icons.lock, isDark)
+                    .copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () => setState(
+                          () => _isPasswordVisible = !_isPasswordVisible,
+                        ),
+                      ),
+                    ),
                 validator: (val) => val!.length < 4 ? "Min 4 characters" : null,
               ),
               const SizedBox(height: 20),
@@ -119,8 +140,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 controller: _confirmPassController,
                 obscureText: !_isPasswordVisible,
                 style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: _inputStyle("Confirm Password", Icons.lock_reset, isDark),
-                validator: (val) => val != _passController.text ? "Passwords do not match" : null,
+                decoration: _inputStyle(
+                  "Confirm Password",
+                  Icons.lock_reset,
+                  isDark,
+                ),
+                validator: (val) => val != _passController.text
+                    ? "Passwords do not match"
+                    : null,
               ),
 
               const SizedBox(height: 40),
@@ -131,12 +158,20 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _isLoading ? null : _handleReset,
-                  child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("UPDATE PASSWORD", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "UPDATE PASSWORD",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -147,7 +182,12 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 
   // --- REUSING YOUR UI HELPERS ---
-  InputDecoration _inputStyle(String label, IconData icon, bool isDark, [String? hint]) {
+  InputDecoration _inputStyle(
+    String label,
+    IconData icon,
+    bool isDark, [
+    String? hint,
+  ]) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
@@ -156,7 +196,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade400),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : Colors.grey.shade400,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -165,7 +207,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     );
   }
 
-  Widget _buildField({required bool isDark, required TextEditingController controller, required String label, required IconData icon, String? hint, required String? Function(String?) validator}) {
+  Widget _buildField({
+    required bool isDark,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? hint,
+    required String? Function(String?) validator,
+  }) {
     return TextFormField(
       controller: controller,
       validator: validator,

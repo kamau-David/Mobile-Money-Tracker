@@ -7,12 +7,14 @@ class UserData {
   final String email;
   final String userId;
   final String memberSince;
+  final String? token; // ADDED: Spot for the Backend Key
 
   UserData({
     required this.name,
     required this.email,
     required this.userId,
     required this.memberSince,
+    this.token, // Optional so it doesn't break initialization
   });
 }
 
@@ -24,6 +26,7 @@ class UserNotifier extends StateNotifier<UserData> {
           email: "",
           userId: "KES-000",
           memberSince: "---",
+          token: null,
         ),
       ) {
     _loadUserData();
@@ -36,25 +39,52 @@ class UserNotifier extends StateNotifier<UserData> {
     final email = prefs.getString('user_email') ?? "";
     final userId = prefs.getString('user_id') ?? "KES-000";
     final memberSince = prefs.getString('member_since') ?? "---";
+    final token = prefs.getString('auth_token'); // Load the key
 
     state = UserData(
       name: name,
       email: email,
       userId: userId,
       memberSince: memberSince,
+      token: token,
     );
   }
 
-  /// Updates profile and ensures ID/Date are generated ONLY if they don't exist
+  /// UPDATED: This now handles the token from your Backend Login
+  Future<void> setAuthenticatedUser({
+    required String name,
+    required String email,
+    required String token,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    String currentId =
+        "KES-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
+    String currentMemberSince = DateFormat('MMMM yyyy').format(DateTime.now());
+
+    state = UserData(
+      name: name,
+      email: email,
+      userId: currentId,
+      memberSince: currentMemberSince,
+      token: token,
+    );
+
+    await prefs.setString('user_name', name);
+    await prefs.setString('user_email', email);
+    await prefs.setString('user_id', currentId);
+    await prefs.setString('member_since', currentMemberSince);
+    await prefs.setString('auth_token', token); // Persist the key
+  }
+
+  /// Updates profile (Maintains your existing logic)
   Future<void> updateProfile(String name, String email) async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Preserve existing ID or generate a new one if it's the first time
     String currentId = state.userId != "KES-000"
         ? state.userId
         : "KES-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
 
-    // Preserve existing date or set it to 'now' if it's the first time
     String currentMemberSince = state.memberSince != "---"
         ? state.memberSince
         : DateFormat('MMMM yyyy').format(DateTime.now());
@@ -64,25 +94,26 @@ class UserNotifier extends StateNotifier<UserData> {
       email: email,
       userId: currentId,
       memberSince: currentMemberSince,
+      token: state.token, // Preserve existing token
     );
 
-    // Persist to local storage
     await prefs.setString('user_name', name);
     await prefs.setString('user_email', email);
     await prefs.setString('user_id', currentId);
     await prefs.setString('member_since', currentMemberSince);
   }
 
-  /// Resets user data (useful for Logout or wiping the device)
+  /// Resets user data
   Future<void> clearUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Wipes all SharedPreferences keys
+    await prefs.clear();
 
     state = UserData(
       name: "User",
       email: "",
       userId: "KES-000",
       memberSince: "---",
+      token: null,
     );
   }
 }
