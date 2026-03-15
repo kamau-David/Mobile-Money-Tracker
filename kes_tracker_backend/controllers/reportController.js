@@ -5,7 +5,7 @@ const nodemailer = require("nodemailer");
 
 exports.generatePDF = async (req, res) => {
   try {
-    const userId = req.user; // From your 'protect' middleware
+    const userId = req.user;
     const { category, start, end, txId } = req.query;
 
     const trendStart =
@@ -15,8 +15,23 @@ exports.generatePDF = async (req, res) => {
         .split("T")[0];
     const trendEnd = end || new Date().toISOString().split("T")[0];
 
-    // 1. Fetch Data using your User and Transaction models
+    // 1. Fetch Data
     const user = await User.findById(userId);
+
+    // --- SUBSCRIPTION CHECK ---
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const isPro = user.subscription_status === "pro";
+    const hasUsedFreeCredit = user.free_pdf_count >= 1;
+
+    if (!isPro && hasUsedFreeCredit) {
+      return res.status(403).json({
+        error: "Upgrade Required",
+        message:
+          "You've already used your free statement. Upgrade to KES Tracker Pro for unlimited reports!",
+      });
+    }
+
     const transactions = await Transaction.findForReport(userId, {
       category,
       startDate: start,
@@ -29,14 +44,12 @@ exports.generatePDF = async (req, res) => {
       trendEnd,
     );
 
-    if (!user) return res.status(404).json({ error: "User not found" });
     if (!transactions || transactions.length === 0)
       return res.status(404).json({ error: "No transactions found" });
 
     // 2. Initialize PDF Document
     const doc = new PDFDocument({ margin: 50, bufferPages: true });
 
-    // --- Buffer Logic: Collect chunks for Nodemailer ---
     let buffers = [];
     doc.on("data", buffers.push.bind(buffers));
 
@@ -53,7 +66,7 @@ exports.generatePDF = async (req, res) => {
       .text("Professional Financial Statement", { align: "right" });
     doc.moveDown();
 
-    // --- USER DETAILS (Matched to your UserModel) ---
+    // --- USER DETAILS ---
     doc
       .fontSize(12)
       .fillColor("#000")
@@ -124,7 +137,6 @@ exports.generatePDF = async (req, res) => {
         .lineWidth(1)
         .stroke();
 
-      // Expense Line (Red)
       doc.strokeColor("#C62828").lineWidth(2);
       trends.forEach((d, i) => {
         const x = startX + i * (chartWidth / (trends.length - 1));
@@ -133,7 +145,6 @@ exports.generatePDF = async (req, res) => {
       });
       doc.stroke();
 
-      // Income Line (Green)
       doc.strokeColor("#2E7D32").lineWidth(2);
       trends.forEach((d, i) => {
         const x = startX + i * (chartWidth / (trends.length - 1));
@@ -215,11 +226,15 @@ exports.generatePDF = async (req, res) => {
         );
     }
 
-    // --- FINALIZATION: Handle Email and Download ---
     doc.end();
 
     doc.on("end", async () => {
       const pdfBuffer = Buffer.concat(buffers);
+
+      // --- INCREMENT COUNT FOR FREE USERS ---
+      if (!isPro) {
+        await User.incrementPdfCount(userId);
+      }
 
       // --- NODEMAILER LOGIC ---
       const transporter = nodemailer.createTransport({
@@ -232,7 +247,7 @@ exports.generatePDF = async (req, res) => {
 
       const mailOptions = {
         from: `"KES Tracker" <${process.env.EMAIL_USER}>`,
-        to: user.email_address, // Using your specific UserModel column name
+        to: user.email_address,
         subject: `Your KES Tracker Statement - ${new Date().toLocaleDateString()}`,
         html: `
           <div style="font-family: Arial, sans-serif; color: #333;">
@@ -254,12 +269,10 @@ exports.generatePDF = async (req, res) => {
 
       try {
         await transporter.sendMail(mailOptions);
-        console.log(`Report sent to ${user.email_address}`);
       } catch (emailErr) {
         console.error("Email dispatch failed:", emailErr);
       }
 
-      // --- BROWSER RESPONSE ---
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
@@ -278,7 +291,7 @@ exports.generatePDF = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
   try {
     const userId = req.user;
-    const categoryStats = await Transaction.getCategoryTotals(userId); // Matches your Transaction model method
+    const categoryStats = await Transaction.getCategoryTotals(userId);
 
     const totalSpent = categoryStats.reduce(
       (sum, item) => sum + parseFloat(item.total),
